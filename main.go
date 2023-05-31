@@ -6,7 +6,6 @@ import (
     "github.com/jamesruan/sodium"
     "net"
     "os"
-    "unsafe"
 )
 
 func errorExit(msg string) {
@@ -44,9 +43,22 @@ func main() {
         clientMessageBuffer := make([]byte, 12)
         var n = 0
         for n == 0 { n, err = connection.Read(clientMessageBuffer)}
-        fmt.Println(string(clientMessageBuffer))
+        fmt.Println("a ", string(clientMessageBuffer))
 
-        fmt.Println(unsafe.Sizeof(*sessionKeys)) // TODO: just to remove 'unused variable' error
+        fmt.Println("rx:")
+        for _, i := range sessionKeys.Rx.Bytes { fmt.Printf("%d ", i) }
+        fmt.Println("\ntx:")
+        for _, i := range sessionKeys.Tx.Bytes { fmt.Printf("%d ", i) }
+
+        // trying to decrypt the message
+        //decrypted, err := sodium.Bytes(clientMessageBuffer).BoxOpen(
+        //    sodium.BoxNonce{Bytes: sodium.Bytes("123456789012345678901234")},
+        //    sodium.BoxPublicKey(sessionKeys.Rx),
+        //    sodium.BoxSecretKey(sessionKeys.Tx),
+        //)
+        //if err != nil { errorExit("error decrypting the message " + err.Error()) }
+        //
+        //fmt.Println("b ", string(decrypted))
 
         connection.Close()
     //}
