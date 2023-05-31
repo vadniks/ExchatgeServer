@@ -27,7 +27,7 @@ func main() {
         if err != nil { errorExit("error accepting " + err.Error()) }
 
         // sending server's public key
-        _, err = connection.Write(serverKeys.PublicKey.Bytes)
+        _, err = connection.Write(serverKeys.PublicKey.Bytes) // TODO: implement message sections splitting mechanism
 
         // receiving client's public key
         clientPublicKeyBuffer := make([]byte, serverKeys.PublicKey.Size())
@@ -45,12 +45,12 @@ func main() {
         for n == 0 { n, err = connection.Read(clientMessageBuffer)}
         fmt.Println("a ", string(clientMessageBuffer))
 
-        fmt.Println("rx:")
+        fmt.Println("rx:") // TODO: test only
         for _, i := range sessionKeys.Rx.Bytes { fmt.Printf("%d ", i) }
         fmt.Println("\ntx:")
         for _, i := range sessionKeys.Tx.Bytes { fmt.Printf("%d ", i) }
 
-        // trying to decrypt the message
+        // trying to decrypt the message // TODO: crypto_secretbox_*()
         //decrypted, err := sodium.Bytes(clientMessageBuffer).BoxOpen(
         //    sodium.BoxNonce{Bytes: sodium.Bytes("123456789012345678901234")},
         //    sodium.BoxPublicKey(sessionKeys.Rx),
