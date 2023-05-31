@@ -40,6 +40,12 @@ func main() {
         var sessionKeys, err2 = serverKeys.ServerSessionKeys(clientPublicKey)
         if err2 != nil { errorExit("error creating session keys " + err.Error()) }
 
+        // trying to read client's message
+        clientMessageBuffer := make([]byte, 12)
+        var n = 0
+        for n == 0 { n, err = connection.Read(clientMessageBuffer)}
+        fmt.Println(string(clientMessageBuffer))
+
         fmt.Println(unsafe.Sizeof(*sessionKeys)) // TODO: just to remove 'unused variable' error
 
         connection.Close()
