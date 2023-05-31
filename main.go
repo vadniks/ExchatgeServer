@@ -3,6 +3,7 @@ package main
 
 import (
     "fmt"
+    "github.com/jamesruan/sodium"
     "net"
     "os"
 )
@@ -18,17 +19,28 @@ func main() {
 
     defer server.Close()
 
-    for {
+    var serverKeys = sodium.MakeKXKP()
+
+    //for {
+        // setting connection
         connection, err := server.Accept()
         if err != nil { errorExit("error accepting " + err.Error()) }
 
-        buffer := make([]byte, 256)
-        length, err := connection.Read(buffer)
+        // sending server's public key
+        _, err = connection.Write(serverKeys.PublicKey.Bytes)
 
+        // receiving client's public key
+        clientPublicKeyBuffer := make([]byte, serverKeys.PublicKey.Size())
+        _, err = connection.Read(clientPublicKeyBuffer)
         if err != nil { errorExit("error reading" + err.Error()) }
-        fmt.Println(string(buffer[:length]))
 
-        _, err = connection.Write([]byte(" World!"))
+        // generating session keys
+        var clientPublicKey = sodium.KXPublicKey{Bytes: clientPublicKeyBuffer}
+        var sessionKeys, err2 = serverKeys.ServerSessionKeys(clientPublicKey)
+        if err2 != nil { errorExit("error creating session keys") }
+
+        fmt.Println(sessionKeys)
+
         connection.Close()
-    }
+    //}
 }
