@@ -28,19 +28,6 @@ func main() {
     //}
 }
 
-const NetMessageHeadSize = 4 * 4 + 8 // TODO: move to separate source file
-const NetMessageBodySize = 1 << 10
-const NetReceiveBufferSize = NetMessageHeadSize + NetMessageBodySize
-
-type Message struct {
-    flag int32
-    timestamp uint64
-    size uint32
-    index uint32
-    count uint32
-    bytes [NetMessageBodySize]byte
-}
-
 func processClient(connection net.Conn, serverKeys sodium.KXKP) {
     // sending server's public key
     _, err := connection.Write(serverKeys.PublicKey.Bytes) // TODO: implement message sections splitting mechanism
