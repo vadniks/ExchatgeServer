@@ -26,6 +26,19 @@ func main() {
     //}
 }
 
+const NetMessageHeadSize = 4 * 4 + 8 // TODO: move to separate source file
+const NetMessageBodySize = 1 << 10
+const NetReceiveBufferSize = NetMessageHeadSize + NetMessageBodySize
+
+type Message struct {
+    flag int32
+    timestamp uint64
+    size uint32
+    index uint32
+    count uint32
+    bytes [NetMessageBodySize]byte
+}
+
 func processClient(server net.Listener, serverKeys sodium.KXKP) {
     // setting connection
     connection, err := server.Accept()
