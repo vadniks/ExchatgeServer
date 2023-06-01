@@ -22,7 +22,9 @@ func main() {
     var serverKeys = sodium.MakeKXKP()
 
     //for {
-        /*go*/ processClient(server, serverKeys)
+        connection, err := server.Accept()
+        if err != nil { errorExit("error accepting " + err.Error()) }
+        /*go*/ processClient(connection, serverKeys)
     //}
 }
 
@@ -39,13 +41,9 @@ type Message struct {
     bytes [NetMessageBodySize]byte
 }
 
-func processClient(server net.Listener, serverKeys sodium.KXKP) {
-    // setting connection
-    connection, err := server.Accept()
-    if err != nil { errorExit("error accepting " + err.Error()) }
-
+func processClient(connection net.Conn, serverKeys sodium.KXKP) {
     // sending server's public key
-    _, err = connection.Write(serverKeys.PublicKey.Bytes) // TODO: implement message sections splitting mechanism
+    _, err := connection.Write(serverKeys.PublicKey.Bytes) // TODO: implement message sections splitting mechanism
     if err != nil { errorExit("error sending public key " + err.Error()) }
 
     // sending nonce
