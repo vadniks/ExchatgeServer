@@ -22,23 +22,23 @@ func (message *Message) pack() []byte {
     const longSize = 8
 
     flagBytes := make([]byte, intSize)
-    binary.BigEndian.PutUint32(flagBytes, uint32(message.flag))
+    binary.LittleEndian.PutUint32(flagBytes, uint32(message.flag))
     for index, item := range flagBytes { bytes[index] = item }
 
     timestampBytes := make([]byte, longSize)
-    binary.BigEndian.PutUint64(timestampBytes, message.timestamp)
+    binary.LittleEndian.PutUint64(timestampBytes, message.timestamp)
     for index, item := range timestampBytes { bytes[index + intSize] = item }
 
     sizeBytes := make([]byte, intSize)
-    binary.BigEndian.PutUint32(sizeBytes, message.size)
+    binary.LittleEndian.PutUint32(sizeBytes, message.size)
     for index, item := range sizeBytes { bytes[index + intSize + longSize] = item }
 
     indexBytes := make([]byte, intSize)
-    binary.BigEndian.PutUint32(indexBytes, message.size)
+    binary.LittleEndian.PutUint32(indexBytes, message.size)
     for index, item := range indexBytes { bytes[index + intSize * 2 + longSize] = item }
 
     countBytes := make([]byte, intSize)
-    binary.BigEndian.PutUint32(countBytes, message.size)
+    binary.LittleEndian.PutUint32(countBytes, message.size)
     for index, item := range countBytes { bytes[index + intSize * 3 + longSize] = item }
 
     for index, item := range message.body { bytes[index + NetMessageHeadSize] = item }
@@ -47,5 +47,6 @@ func (message *Message) pack() []byte {
 }
 
 func unpackMessage(bytes []byte) *Message {
+
     return nil
 }
