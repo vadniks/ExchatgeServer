@@ -18,27 +18,32 @@ type Message struct {
     body [NetMessageBodySize]byte
 }
 
+func putUint32(b []byte, v uint32) { binary.LittleEndian.PutUint32(b, v) }
+func putUint64(b []byte, v uint64) { binary.LittleEndian.PutUint64(b, v) }
+func getUint32(b []byte) uint32 { return binary.LittleEndian.Uint32(b) }
+func getUint64(b []byte) uint64 { return binary.LittleEndian.Uint64(b) }
+
 func (message *Message) pack() []byte {
     bytes := make([]byte, NetReceiveBufferSize)
 
     flagBytes := make([]byte, intSize)
-    binary.LittleEndian.PutUint32(flagBytes, uint32(message.flag))
+    putUint32(flagBytes, uint32(message.flag))
     for index, item := range flagBytes { bytes[index] = item }
 
     timestampBytes := make([]byte, longSize)
-    binary.LittleEndian.PutUint64(timestampBytes, message.timestamp)
+    putUint64(timestampBytes, message.timestamp)
     for index, item := range timestampBytes { bytes[index + intSize] = item }
 
     sizeBytes := make([]byte, intSize)
-    binary.LittleEndian.PutUint32(sizeBytes, message.size)
+    putUint32(sizeBytes, message.size)
     for index, item := range sizeBytes { bytes[index + intSize + longSize] = item }
 
     indexBytes := make([]byte, intSize)
-    binary.LittleEndian.PutUint32(indexBytes, message.size)
+    putUint32(indexBytes, message.size)
     for index, item := range indexBytes { bytes[index + intSize * 2 + longSize] = item }
 
     countBytes := make([]byte, intSize)
-    binary.LittleEndian.PutUint32(countBytes, message.size)
+    putUint32(countBytes, message.size)
     for index, item := range countBytes { bytes[index + intSize * 3 + longSize] = item }
 
     for index, item := range message.body { bytes[index + NetMessageHeadSize] = item }
@@ -48,11 +53,11 @@ func (message *Message) pack() []byte {
 
 func unpackMessage(bytes []byte) *Message {
     msg := &Message{
-        int32(binary.LittleEndian.Uint32(bytes[:intSize])),
-        binary.LittleEndian.Uint64(bytes[intSize:longSize + intSize]),
-        binary.LittleEndian.Uint32(bytes[intSize + longSize:intSize * 2 + longSize]),
-        binary.LittleEndian.Uint32(bytes[intSize * 2 + longSize:intSize * 3 + longSize]),
-        binary.LittleEndian.Uint32(bytes[intSize * 3 + longSize:intSize * 3 + longSize]),
+        int32(getUint32(bytes[:intSize])),
+        getUint64(bytes[intSize:longSize + intSize]),
+        getUint32(bytes[intSize + longSize:intSize * 2 + longSize]),
+        getUint32(bytes[intSize * 2 + longSize:intSize * 3 + longSize]),
+        getUint32(bytes[intSize * 3 + longSize:intSize * 3 + longSize]),
         [NetMessageBodySize]byte{},
     }
 
