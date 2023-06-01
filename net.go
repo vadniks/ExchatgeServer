@@ -6,6 +6,8 @@ import "encoding/binary"
 const NetMessageHeadSize = 4 * 4 + 8
 const NetMessageBodySize = 1 << 10
 const NetReceiveBufferSize = NetMessageHeadSize + NetMessageBodySize
+const intSize = 4
+const longSize = 8
 
 type Message struct {
     flag int32
@@ -18,8 +20,6 @@ type Message struct {
 
 func (message *Message) pack() []byte {
     bytes := make([]byte, NetReceiveBufferSize)
-    const intSize = 4
-    const longSize = 8
 
     flagBytes := make([]byte, intSize)
     binary.LittleEndian.PutUint32(flagBytes, uint32(message.flag))
@@ -47,6 +47,15 @@ func (message *Message) pack() []byte {
 }
 
 func unpackMessage(bytes []byte) *Message {
+    msg := &Message{
+        int32(binary.LittleEndian.Uint32(bytes[:intSize])),
+        binary.LittleEndian.Uint64(bytes[intSize:longSize + intSize]),
+        binary.LittleEndian.Uint32(bytes[intSize + longSize:intSize * 2 + longSize]),
+        binary.LittleEndian.Uint32(bytes[intSize * 2 + longSize:intSize * 3 + longSize]),
+        binary.LittleEndian.Uint32(bytes[intSize * 3 + longSize:intSize * 3 + longSize]),
+        [NetMessageBodySize]byte{},
+    }
 
-    return nil
+    for index, item := range bytes[NetMessageHeadSize:] { msg.body[index + NetMessageHeadSize] = item }
+    return msg
 }
