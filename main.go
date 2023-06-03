@@ -47,7 +47,10 @@ func processClient(connection net.Conn, serverKeys sodium.KXKP) {
     clientMessageBuffer := make([]byte, MessageSize)
     var n = 0
     for n == 0 { n, err = connection.Read(clientMessageBuffer)}
-    for _, i := range clientMessageBuffer { fmt.Printf("%d ", i) }
+    //for _, i := range clientMessageBuffer { fmt.Printf("%d ", i) }
+    //fmt.Println()
+    msg := unpackMessage(clientMessageBuffer)
+    fmt.Println(msg.flag, msg.timestamp, msg.size, msg.index, msg.count, string(msg.body[:])) // TODO: unpack works
 
     //fmt.Println("rx:") // TODO: test only
     //for _, i := range sessionKeys.Rx.Bytes { fmt.Printf("%d ", i) }

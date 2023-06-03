@@ -58,10 +58,10 @@ func unpackMessage(bytes []byte) *Message {
         getUint64(bytes[intSize:longSize + intSize]),
         getUint32(bytes[intSize + longSize:intSize * 2 + longSize]),
         getUint32(bytes[intSize * 2 + longSize:intSize * 3 + longSize]),
-        getUint32(bytes[intSize * 3 + longSize:intSize * 3 + longSize]),
+        getUint32(bytes[intSize * 3 + longSize:MessageHeadSize]),
         [MessageBodySize]byte{},
     }
 
-    for index, item := range bytes[MessageHeadSize:] { msg.body[index + MessageHeadSize] = item }
+    for index, item := range bytes[MessageHeadSize:] { msg.body[index] = item }
     return msg
 }
