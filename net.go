@@ -3,9 +3,10 @@ package main
 
 import "encoding/binary"
 
-const NetMessageHeadSize = 4 * 4 + 8
-const NetMessageBodySize = 1 << 10
-const NetReceiveBufferSize = NetMessageHeadSize + NetMessageBodySize
+const MessageHeadSize = 4 * 4 + 8 // 24
+const MessageBodySize = 1 << 10 // 1024
+const MessageSize = MessageHeadSize + MessageBodySize // 1048
+const ReceiveBufferSize = 1096 // TODO: encryptedSize
 const intSize = 4
 const longSize = 8
 
@@ -15,7 +16,7 @@ type Message struct {
     size uint32
     index uint32
     count uint32
-    body [NetMessageBodySize]byte
+    body [MessageBodySize]byte
 }
 
 func putUint32(b []byte, v uint32) { binary.LittleEndian.PutUint32(b, v) }
@@ -24,7 +25,7 @@ func getUint32(b []byte) uint32 { return binary.LittleEndian.Uint32(b) }
 func getUint64(b []byte) uint64 { return binary.LittleEndian.Uint64(b) }
 
 func (message *Message) pack() []byte {
-    bytes := make([]byte, NetReceiveBufferSize)
+    bytes := make([]byte, ReceiveBufferSize)
 
     flagBytes := make([]byte, intSize)
     putUint32(flagBytes, uint32(message.flag))
@@ -46,7 +47,7 @@ func (message *Message) pack() []byte {
     putUint32(countBytes, message.size)
     for index, item := range countBytes { bytes[index + intSize * 3 + longSize] = item }
 
-    for index, item := range message.body { bytes[index + NetMessageHeadSize] = item }
+    for index, item := range message.body { bytes[index + MessageHeadSize] = item }
 
     return bytes
 }
@@ -58,9 +59,9 @@ func unpackMessage(bytes []byte) *Message {
         getUint32(bytes[intSize + longSize:intSize * 2 + longSize]),
         getUint32(bytes[intSize * 2 + longSize:intSize * 3 + longSize]),
         getUint32(bytes[intSize * 3 + longSize:intSize * 3 + longSize]),
-        [NetMessageBodySize]byte{},
+        [MessageBodySize]byte{},
     }
 
-    for index, item := range bytes[NetMessageHeadSize:] { msg.body[index + NetMessageHeadSize] = item }
+    for index, item := range bytes[MessageHeadSize:] { msg.body[index + MessageHeadSize] = item }
     return msg
 }

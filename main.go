@@ -33,11 +33,6 @@ func processClient(connection net.Conn, serverKeys sodium.KXKP) {
     _, err := connection.Write(serverKeys.PublicKey.Bytes) // TODO: implement message sections splitting mechanism
     if err != nil { errorExit("error sending public key " + err.Error()) }
 
-    // sending nonce
-    nonce := sodium.SecretBoxNonce{}
-    nonce.Next()
-    _, err = connection.Write(nonce.Bytes)
-
     // receiving client's public key
     clientPublicKeyBuffer := make([]byte, serverKeys.PublicKey.Size())
     _, err = connection.Read(clientPublicKeyBuffer)
@@ -49,10 +44,10 @@ func processClient(connection net.Conn, serverKeys sodium.KXKP) {
     if err2 != nil { errorExit("error creating session keys " + err.Error()) }
 
     // trying to read client's message
-    clientMessageBuffer := make([]byte, 12)
-    var n = 0
-    for n == 0 { n, err = connection.Read(clientMessageBuffer)}
-    fmt.Println("a ", string(clientMessageBuffer))
+    //clientMessageBuffer := make([]byte, 12)
+    //var n = 0
+    //for n == 0 { n, err = connection.Read(clientMessageBuffer)}
+    //fmt.Println("a ", string(clientMessageBuffer))
 
     fmt.Println("rx:") // TODO: test only
     for _, i := range sessionKeys.Rx.Bytes { fmt.Printf("%d ", i) }
