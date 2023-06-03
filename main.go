@@ -40,19 +40,19 @@ func processClient(connection net.Conn, serverKeys sodium.KXKP) {
 
     // generating session keys
     var clientPublicKey = sodium.KXPublicKey{Bytes: clientPublicKeyBuffer}
-    var sessionKeys, err2 = serverKeys.ServerSessionKeys(clientPublicKey)
+    var _/*sessionKeys*/, err2 = serverKeys.ServerSessionKeys(clientPublicKey)
     if err2 != nil { errorExit("error creating session keys " + err.Error()) }
 
     // trying to read client's message
-    //clientMessageBuffer := make([]byte, 12)
-    //var n = 0
-    //for n == 0 { n, err = connection.Read(clientMessageBuffer)}
-    //fmt.Println("a ", string(clientMessageBuffer))
+    clientMessageBuffer := make([]byte, MessageSize)
+    var n = 0
+    for n == 0 { n, err = connection.Read(clientMessageBuffer)}
+    for _, i := range clientMessageBuffer { fmt.Printf("%d ", i) }
 
-    fmt.Println("rx:") // TODO: test only
-    for _, i := range sessionKeys.Rx.Bytes { fmt.Printf("%d ", i) }
-    fmt.Println("\ntx:")
-    for _, i := range sessionKeys.Tx.Bytes { fmt.Printf("%d ", i) }
+    //fmt.Println("rx:") // TODO: test only
+    //for _, i := range sessionKeys.Rx.Bytes { fmt.Printf("%d ", i) }
+    //fmt.Println("\ntx:")
+    //for _, i := range sessionKeys.Tx.Bytes { fmt.Printf("%d ", i) }
 
     // trying to decrypt the message // TODO: crypto_secretbox_*()
     //decrypted, err := sodium.Bytes(clientMessageBuffer).BoxOpen(
