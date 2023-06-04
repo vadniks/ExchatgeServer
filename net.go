@@ -59,15 +59,15 @@ func (message *Message) pack() []byte {
     return bytes
 }
 
+//goland:noinspection GoRedundantConversion (*byte)
 func unpackMessage(bytes []byte) *Message {
-    message := &Message{
-        int32(getUint32(bytes[:intSize])),
-        getUint64(bytes[intSize:longSize + intSize]),
-        getUint32(bytes[intSize + longSize:intSize * 2 + longSize]),
-        getUint32(bytes[intSize * 2 + longSize:intSize * 3 + longSize]),
-        getUint32(bytes[intSize * 3 + longSize:MessageHeadSize]),
-        [MessageBodySize]byte{},
-    }
+    message := &Message{}
+
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&message.flag)), intSize), unsafe.Slice(&(bytes[0]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&message.timestamp)), longSize), unsafe.Slice(&(bytes[intSize]), longSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&message.size)), intSize), unsafe.Slice(&(bytes[intSize + longSize]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&message.index)), intSize), unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&message.count)), intSize), unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize))
 
     copy(unsafe.Slice(&(message.body[0]), MessageBodySize), unsafe.Slice(&(bytes[MessageHeadSize]), MessageBodySize))
     return message
