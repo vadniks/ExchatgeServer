@@ -23,7 +23,7 @@ type Message struct {
 }
 
 func putUint32(b *[]byte, v uint32) {
-    bb := (*[unsafe.Sizeof(v)]byte)(unsafe.Pointer(b))
+    bb := (*[unsafe.Sizeof(v)]byte) (unsafe.Pointer(b))
     (*bb)[0] = byte(v)
     (*bb)[1] = byte(v >> 8)
     (*bb)[2] = byte(v >> 16)
@@ -31,7 +31,7 @@ func putUint32(b *[]byte, v uint32) {
 }
 
 func putUint64(b *[]byte, v uint64) {
-    bb := (*[unsafe.Sizeof(v)]byte)(unsafe.Pointer(b))
+    bb := (*[unsafe.Sizeof(v)]byte) (unsafe.Pointer(b))
     (*bb)[0] = byte(v)
     (*bb)[1] = byte(v >> 8)
     (*bb)[2] = byte(v >> 16)
@@ -49,11 +49,11 @@ func getUint64(b []byte) uint64 { return binary.LittleEndian.Uint64(b) }
 func (message *Message) pack() []byte {
     bytes := make([]byte, MessageSize)
 
-    copy(unsafe.Slice(&(bytes[0]), intSize), unsafe.Slice((*byte)(unsafe.Pointer(&message.flag)), intSize))
-    copy(unsafe.Slice(&(bytes[intSize]), longSize), unsafe.Slice((*byte)(unsafe.Pointer(&message.timestamp)), longSize))
-    copy(unsafe.Slice(&(bytes[intSize + longSize]), intSize), unsafe.Slice((*byte)(unsafe.Pointer(&message.size)), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize), unsafe.Slice((*byte)(unsafe.Pointer(&message.index)), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize), unsafe.Slice((*byte)(unsafe.Pointer(&message.count)), intSize))
+    copy(unsafe.Slice(&(bytes[0]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&message.flag)), intSize))
+    copy(unsafe.Slice(&(bytes[intSize]), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&message.timestamp)), longSize))
+    copy(unsafe.Slice(&(bytes[intSize + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&message.size)), intSize))
+    copy(unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&message.index)), intSize))
+    copy(unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&message.count)), intSize))
 
     copy(unsafe.Slice(&(bytes[MessageHeadSize]), MessageBodySize), unsafe.Slice(&(message.body[0]), MessageBodySize))
     return bytes
