@@ -1,7 +1,11 @@
 
 package main
 
-import "encoding/binary"
+import (
+    "encoding/binary"
+    "reflect"
+    "unsafe"
+)
 
 const MessageHeadSize = 4 * 4 + 8 // 24
 const MessageBodySize = 1 << 10 // 1024
@@ -19,35 +23,44 @@ type Message struct {
     body [MessageBodySize]byte
 }
 
-func putUint32(b []byte, v uint32) { binary.LittleEndian.PutUint32(b, v) }
-func putUint64(b []byte, v uint64) { binary.LittleEndian.PutUint64(b, v) }
+func putUint32(b *[]byte, v uint32) {
+    bb := (*[unsafe.Sizeof(v)]byte)(unsafe.Pointer(b))
+    (*bb)[0] = byte(v)
+    (*bb)[1] = byte(v >> 8)
+    (*bb)[2] = byte(v >> 16)
+    (*bb)[3] = byte(v >> 24)
+}
+
+func putUint64(b *[]byte, v uint64) {
+    bb := (*[unsafe.Sizeof(v)]byte)(unsafe.Pointer(b))
+    (*bb)[0] = byte(v)
+    (*bb)[1] = byte(v >> 8)
+    (*bb)[2] = byte(v >> 16)
+    (*bb)[3] = byte(v >> 24)
+    (*bb)[4] = byte(v >> 32)
+    (*bb)[5] = byte(v >> 40)
+    (*bb)[6] = byte(v >> 48)
+    (*bb)[7] = byte(v >> 56)
+}
+
 func getUint32(b []byte) uint32 { return binary.LittleEndian.Uint32(b) }
 func getUint64(b []byte) uint64 { return binary.LittleEndian.Uint64(b) }
 
-func (message *Message) pack() []byte { // TODO: write all ints/longs directly in bytes buffer without creating separate buffers for each using unsafe package
+func (message *Message) pack() []byte {
     bytes := make([]byte, MessageSize)
+    reflectValue := reflect.ValueOf(bytes)
 
-    flagBytes := make([]byte, intSize)
-    putUint32(flagBytes, uint32(message.flag))
-    for index, item := range flagBytes { bytes[index] = item }
+    getBufferSegment := func(offset uint) *[]byte {
+        return (*[]byte) (unsafe.Add(unsafe.Pointer(reflectValue.Pointer()), offset))
+    }
 
-    timestampBytes := make([]byte, longSize)
-    putUint64(timestampBytes, message.timestamp)
-    for index, item := range timestampBytes { bytes[index + intSize] = item }
+    putUint32(getBufferSegment(0), uint32(message.flag))
+    putUint64(getBufferSegment(intSize), message.timestamp)
+    putUint32(getBufferSegment(intSize + longSize), message.size)
+    putUint32(getBufferSegment(intSize * 2 + longSize), message.index)
+    putUint32(getBufferSegment(intSize * 3 + longSize), message.count)
 
-    sizeBytes := make([]byte, intSize)
-    putUint32(sizeBytes, message.size)
-    for index, item := range sizeBytes { bytes[index + intSize + longSize] = item }
-
-    indexBytes := make([]byte, intSize)
-    putUint32(indexBytes, message.index)
-    for index, item := range indexBytes { bytes[index + intSize * 2 + longSize] = item }
-
-    countBytes := make([]byte, intSize)
-    putUint32(countBytes, message.count)
-    for index, item := range countBytes { bytes[index + intSize * 3 + longSize] = item }
-
-    for index, item := range message.body { bytes[index + MessageHeadSize] = item }
+    copy(unsafe.Slice(&bytes[MessageHeadSize], MessageBodySize), unsafe.Slice(&(message.body[0]), MessageBodySize))
 
     return bytes
 }
