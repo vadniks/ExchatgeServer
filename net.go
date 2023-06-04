@@ -24,8 +24,8 @@ func putUint64(b []byte, v uint64) { binary.LittleEndian.PutUint64(b, v) }
 func getUint32(b []byte) uint32 { return binary.LittleEndian.Uint32(b) }
 func getUint64(b []byte) uint64 { return binary.LittleEndian.Uint64(b) }
 
-func (message *Message) pack() []byte {
-    bytes := make([]byte, ReceiveBufferSize)
+func (message *Message) pack() []byte { // TODO: write all ints/longs directly in bytes buffer without creating separate buffers for each using unsafe package
+    bytes := make([]byte, MessageSize)
 
     flagBytes := make([]byte, intSize)
     putUint32(flagBytes, uint32(message.flag))
@@ -40,11 +40,11 @@ func (message *Message) pack() []byte {
     for index, item := range sizeBytes { bytes[index + intSize + longSize] = item }
 
     indexBytes := make([]byte, intSize)
-    putUint32(indexBytes, message.size)
+    putUint32(indexBytes, message.index)
     for index, item := range indexBytes { bytes[index + intSize * 2 + longSize] = item }
 
     countBytes := make([]byte, intSize)
-    putUint32(countBytes, message.size)
+    putUint32(countBytes, message.count)
     for index, item := range countBytes { bytes[index + intSize * 3 + longSize] = item }
 
     for index, item := range message.body { bytes[index + MessageHeadSize] = item }

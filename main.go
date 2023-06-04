@@ -14,6 +14,23 @@ func errorExit(msg string) {
 }
 
 func main() {
+    msg := Message{ // TODO: test only
+        flag: 0x7fffffff,
+        timestamp: 0,
+        size: MessageBodySize,
+        index: 0,
+        count: 1,
+        body: [MessageBodySize]byte{},
+    }
+    for i, j := range "Test connection" { msg.body[i] = byte(j) }
+
+    packed := msg.pack() // TODO: test only
+    for _, i := range packed { fmt.Printf("%d ", i) }
+    fmt.Println()
+    unpacked := unpackMessage(packed)
+    fmt.Println(unpacked.flag, unpacked.timestamp, unpacked.size, unpacked.index, unpacked.count, string(unpacked.body[:]))
+    return // TODO: pack also works
+
     server, err := net.Listen("tcp", "localhost:8080")
     if err != nil { errorExit("error listening" + err.Error()) }
 
@@ -30,7 +47,7 @@ func main() {
 
 func processClient(connection net.Conn, serverKeys sodium.KXKP) {
     // sending server's public key
-    _, err := connection.Write(serverKeys.PublicKey.Bytes) // TODO: implement message sections splitting mechanism
+    _, err := connection.Write(serverKeys.PublicKey.Bytes)
     if err != nil { errorExit("error sending public key " + err.Error()) }
 
     // receiving client's public key
@@ -47,8 +64,8 @@ func processClient(connection net.Conn, serverKeys sodium.KXKP) {
     clientMessageBuffer := make([]byte, MessageSize)
     var n = 0
     for n == 0 { n, err = connection.Read(clientMessageBuffer)}
-    //for _, i := range clientMessageBuffer { fmt.Printf("%d ", i) }
-    //fmt.Println()
+    for _, i := range clientMessageBuffer { fmt.Printf("%d ", i) }
+    fmt.Println()
     msg := unpackMessage(clientMessageBuffer)
     fmt.Println(msg.flag, msg.timestamp, msg.size, msg.index, msg.count, string(msg.body[:])) // TODO: unpack works
 
