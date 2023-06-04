@@ -3,7 +3,6 @@ package main
 
 import (
     "encoding/binary"
-    "reflect"
     "unsafe"
 )
 
@@ -46,21 +45,17 @@ func putUint64(b *[]byte, v uint64) {
 func getUint32(b []byte) uint32 { return binary.LittleEndian.Uint32(b) }
 func getUint64(b []byte) uint64 { return binary.LittleEndian.Uint64(b) }
 
+//goland:noinspection GoRedundantConversion (*byte)
 func (message *Message) pack() []byte {
     bytes := make([]byte, MessageSize)
-    reflectValue := reflect.ValueOf(bytes)
 
-    getBufferSegment := func(offset uint) *[]byte {
-        return (*[]byte) (unsafe.Add(unsafe.Pointer(reflectValue.Pointer()), offset))
-    }
+    copy(unsafe.Slice(&(bytes[0]), intSize), unsafe.Slice((*byte)(unsafe.Pointer(&message.flag)), intSize))
+    copy(unsafe.Slice(&(bytes[intSize]), longSize), unsafe.Slice((*byte)(unsafe.Pointer(&message.timestamp)), longSize))
+    copy(unsafe.Slice(&(bytes[intSize + longSize]), intSize), unsafe.Slice((*byte)(unsafe.Pointer(&message.size)), intSize))
+    copy(unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize), unsafe.Slice((*byte)(unsafe.Pointer(&message.index)), intSize))
+    copy(unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize), unsafe.Slice((*byte)(unsafe.Pointer(&message.count)), intSize))
 
-    putUint32(getBufferSegment(0), uint32(message.flag))
-    putUint64(getBufferSegment(intSize), message.timestamp)
-    putUint32(getBufferSegment(intSize + longSize), message.size)
-    putUint32(getBufferSegment(intSize * 2 + longSize), message.index)
-    putUint32(getBufferSegment(intSize * 3 + longSize), message.count)
-
-    copy(unsafe.Slice(&bytes[MessageHeadSize], MessageBodySize), unsafe.Slice(&(message.body[0]), MessageBodySize))
+    copy(unsafe.Slice(&(bytes[MessageHeadSize]), MessageBodySize), unsafe.Slice(&(message.body[0]), MessageBodySize))
     return bytes
 }
 
@@ -74,6 +69,6 @@ func unpackMessage(bytes []byte) *Message {
         [MessageBodySize]byte{},
     }
 
-    copy(unsafe.Slice(&(message.body[0]), MessageBodySize), unsafe.Slice(&bytes[MessageHeadSize], MessageBodySize))
+    copy(unsafe.Slice(&(message.body[0]), MessageBodySize), unsafe.Slice(&(bytes[MessageHeadSize]), MessageBodySize))
     return message
 }
