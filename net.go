@@ -61,7 +61,6 @@ func (message *Message) pack() []byte {
     putUint32(getBufferSegment(intSize * 3 + longSize), message.count)
 
     copy(unsafe.Slice(&bytes[MessageHeadSize], MessageBodySize), unsafe.Slice(&(message.body[0]), MessageBodySize))
-
     return bytes
 }
 
