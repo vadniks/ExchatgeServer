@@ -49,11 +49,11 @@ func getUint64(b []byte) uint64 { return binary.LittleEndian.Uint64(b) }
 func (message *Message) pack() []byte {
     bytes := make([]byte, MessageSize)
 
-    copy(unsafe.Slice(&(bytes[0]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&message.flag)), intSize))
-    copy(unsafe.Slice(&(bytes[intSize]), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&message.timestamp)), longSize))
-    copy(unsafe.Slice(&(bytes[intSize + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&message.size)), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&message.index)), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&message.count)), intSize))
+    copy(unsafe.Slice(&(bytes[0]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), intSize))
+    copy(unsafe.Slice(&(bytes[intSize]), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.timestamp))), longSize))
+    copy(unsafe.Slice(&(bytes[intSize + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), intSize))
+    copy(unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), intSize))
+    copy(unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), intSize))
 
     copy(unsafe.Slice(&(bytes[MessageHeadSize]), MessageBodySize), unsafe.Slice(&(message.body[0]), MessageBodySize))
     return bytes
@@ -63,11 +63,11 @@ func (message *Message) pack() []byte {
 func unpackMessage(bytes []byte) *Message {
     message := &Message{}
 
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&message.flag)), intSize), unsafe.Slice(&(bytes[0]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&message.timestamp)), longSize), unsafe.Slice(&(bytes[intSize]), longSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&message.size)), intSize), unsafe.Slice(&(bytes[intSize + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&message.index)), intSize), unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&message.count)), intSize), unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), intSize), unsafe.Slice(&(bytes[0]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.timestamp))), longSize), unsafe.Slice(&(bytes[intSize]), longSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), intSize), unsafe.Slice(&(bytes[intSize + longSize]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), intSize), unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), intSize), unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize))
 
     copy(unsafe.Slice(&(message.body[0]), MessageBodySize), unsafe.Slice(&(bytes[MessageHeadSize]), MessageBodySize))
     return message
