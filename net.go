@@ -66,7 +66,7 @@ func (message *Message) pack() []byte {
 }
 
 func unpackMessage(bytes []byte) *Message {
-    msg := &Message{
+    message := &Message{
         int32(getUint32(bytes[:intSize])),
         getUint64(bytes[intSize:longSize + intSize]),
         getUint32(bytes[intSize + longSize:intSize * 2 + longSize]),
@@ -75,6 +75,6 @@ func unpackMessage(bytes []byte) *Message {
         [MessageBodySize]byte{},
     }
 
-    for index, item := range bytes[MessageHeadSize:] { msg.body[index] = item }
-    return msg
+    copy(unsafe.Slice(&(message.body[0]), MessageBodySize), unsafe.Slice(&bytes[MessageHeadSize], MessageBodySize))
+    return message
 }
