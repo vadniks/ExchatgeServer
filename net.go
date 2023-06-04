@@ -1,10 +1,7 @@
 
 package main
 
-import (
-    "encoding/binary"
-    "unsafe"
-)
+import "unsafe"
 
 const MessageHeadSize = 4 * 4 + 8 // 24
 const MessageBodySize = 1 << 10 // 1024
@@ -21,29 +18,6 @@ type Message struct {
     count uint32
     body [MessageBodySize]byte
 }
-
-func putUint32(b *[]byte, v uint32) {
-    bb := (*[unsafe.Sizeof(v)]byte) (unsafe.Pointer(b))
-    (*bb)[0] = byte(v)
-    (*bb)[1] = byte(v >> 8)
-    (*bb)[2] = byte(v >> 16)
-    (*bb)[3] = byte(v >> 24)
-}
-
-func putUint64(b *[]byte, v uint64) {
-    bb := (*[unsafe.Sizeof(v)]byte) (unsafe.Pointer(b))
-    (*bb)[0] = byte(v)
-    (*bb)[1] = byte(v >> 8)
-    (*bb)[2] = byte(v >> 16)
-    (*bb)[3] = byte(v >> 24)
-    (*bb)[4] = byte(v >> 32)
-    (*bb)[5] = byte(v >> 40)
-    (*bb)[6] = byte(v >> 48)
-    (*bb)[7] = byte(v >> 56)
-}
-
-func getUint32(b []byte) uint32 { return binary.LittleEndian.Uint32(b) }
-func getUint64(b []byte) uint64 { return binary.LittleEndian.Uint64(b) }
 
 //goland:noinspection GoRedundantConversion (*byte)
 func (message *Message) pack() []byte {
