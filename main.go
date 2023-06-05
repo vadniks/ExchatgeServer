@@ -16,13 +16,20 @@ func main() {
     for i := length; i < 32; i++ { key = append(key, 0) }
 
     encrypted := sodium.Bytes("Encrypted").SecretBox(nonce, sodium.SecretBoxKey{Bytes: key}) // TODO: test only
-    fmt.Println(len(encrypted)) // TODO: need to implement padding addition/removing
+    fmt.Println(len(encrypted))
 
-    cryptState := newCryptoState(16, 1048)
+    cryptState := newCryptoState(16, 1048) // TODO: test only
     padded := cryptState._addPadding(make([]byte, 1048))
     fmt.Println(len(padded))
     for _, j := range padded { fmt.Printf("%d ", j) }
-    fmt.Println() // TODO: it works!
+    fmt.Println()
+
+    unpadded := cryptState._removePadding(padded) // TODO: test only
+    fmt.Println(len(unpadded))
+    for _, j := range unpadded { fmt.Printf("%d ", j) }
+    fmt.Println()
+
+    return
 
     msg := Message{ // TODO: test only
         flag:      0x7fffffff,
