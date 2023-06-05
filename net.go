@@ -6,7 +6,6 @@ import "unsafe"
 const MessageHeadSize = 4 * 4 + 8 // 24
 const MessageBodySize = 1 << 10 // 1024
 const MessageSize = MessageHeadSize + MessageBodySize // 1048
-const ReceiveBufferSize = 1096 // TODO: encryptedSize
 const IntSize = 4 // Gimme the private (file-scope) modifier, ASAP!
 const LongSize = 8 // At least the private modifier as I need the protected and package-private/internal modifiers too
 
