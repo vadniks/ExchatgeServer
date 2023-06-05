@@ -27,3 +27,5 @@ func newCryptState(blockSize uint, unpaddedSize uint) *CryptoState {
         paddedSize + MacSize + NonceSize,
     }
 }
+
+
