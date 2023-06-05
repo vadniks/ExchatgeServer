@@ -8,6 +8,16 @@ import (
 )
 
 func main() {
+    nonce := sodium.SecretBoxNonce{} // TODO: test only
+    sodium.Randomize(&nonce)
+
+    key := sodium.Bytes("12345678") // TODO: test only
+    length := len(key)
+    for i := length; i < 32; i++ { key = append(key, 0) }
+
+    encrypted := sodium.Bytes("Encrypted").SecretBox(nonce, sodium.SecretBoxKey{Bytes: key}) // TODO: test only
+    fmt.Println(len(encrypted)) // TODO: need to implement padding addition/removing
+
     msg := Message{ // TODO: test only
         flag: 0x7fffffff,
         timestamp: 0,

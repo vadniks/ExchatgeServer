@@ -28,4 +28,6 @@ func newCryptState(blockSize uint, unpaddedSize uint) *CryptoState {
     }
 }
 
-
+//func (state *CryptoState) addPadding(bytes []byte) []byte {
+//    //sodium.Bytes(bytes)
+//}
