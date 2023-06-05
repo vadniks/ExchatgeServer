@@ -39,7 +39,7 @@ func newCryptoState(blockSize uint, unpaddedSize uint) *CryptoState {
     }
 }
 
-func (state *CryptoState) encrypt(bytes []byte) []byte { return state._encrypt(state._addPadding(bytes)) }
+func (state *CryptoState) encrypt(bytes []byte) []byte { return state._encrypt(state._addPadding(bytes)) } // TODO: test
 
 func (state *CryptoState) _addPadding(bytes []byte) []byte {
     if uint(len(bytes)) != state.unpaddedSize { justThrow() }
@@ -76,7 +76,7 @@ func (state *CryptoState) _encrypt(bytes []byte) []byte {
     return encrypted
 }
 
-func (state *CryptoState) decrypt(bytes []byte) []byte { return state._removePadding(state._decrypt(bytes)) }
+func (state *CryptoState) decrypt(bytes []byte) []byte { return state._removePadding(state._decrypt(bytes)) } // TODO: test
 
 func (state *CryptoState) _decrypt(bytes []byte) []byte {
     bytesLength := len(bytes)
@@ -92,5 +92,23 @@ func (state *CryptoState) _decrypt(bytes []byte) []byte {
 }
 
 func (state *CryptoState) _removePadding(bytes []byte) []byte {
-    return nil // TODO
+    if uint(len(bytes)) != state.unpaddedSize { justThrow() }
+
+    padded := make([]byte, state._paddedSize)
+    copy(padded, bytes)
+
+    var generatedUnpaddedSize uint64
+    if C.sodium_unpad(
+        (*C.ulong) (&generatedUnpaddedSize),
+        (*C.uchar) (&padded[0]),
+        (C.ulong) (state.blockSize),
+        (C.ulong) (state._paddedSize),
+    ) != 0 { return nil }
+
+    if generatedUnpaddedSize != uint64(state._paddedSize) { return nil }
+
+    unpadded := make([]byte, state.unpaddedSize)
+    copy(unpadded, padded[:state.unpaddedSize])
+
+    return unpadded
 }
