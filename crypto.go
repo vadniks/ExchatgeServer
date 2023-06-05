@@ -15,11 +15,11 @@ type CryptoState struct {
 }
 
 func newCryptState(blockSize uint, unpaddedSize uint) *CryptoState {
-    if blockSize == 0 || unpaddedSize == 0 { _ = errors.New("") }
+    if blockSize == 0 || unpaddedSize == 0 { _ = errors.New("") } // where the f*** is throw keyword?
 
     dividend := unpaddedSize + 1 // where the f*** are runtime constants?
     paddedSize := blockSize * (dividend / blockSize +
-        (func () uint { if dividend % blockSize > 0 { return 1 } else { return 0 } }())) // where the f*** is ternary operator?
+        (func() uint { if dividend % blockSize > 0 { return 1 } else { return 0 } }())) // where the f*** is ternary operator?
     // The language designers won't give me the ternary operator? - Okay, I'll do it in creepy way!
 
     return &CryptoState{
