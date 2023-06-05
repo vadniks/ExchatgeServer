@@ -17,8 +17,8 @@ const _SessionKeySize = PublicKeySize
 
 type CryptoState struct {
     blockSize uint
-    unpaddedSize  uint
-    _paddedSize   uint
+    unpaddedSize uint
+    _paddedSize uint
     encryptedSize uint
     _sessionKeys sodium.KXKP
 }
@@ -27,9 +27,7 @@ func newCryptoState(blockSize uint, unpaddedSize uint) *CryptoState {
     if blockSize == 0 || unpaddedSize == 0 { justThrow() } // where the f*** is throw keyword?
 
     dividend := unpaddedSize + 1 // where the f*** are runtime constants?
-    paddedSize := blockSize * (dividend / blockSize +
-        (func() uint { if dividend % blockSize > 0 { return 1 } else { return 0 } }())) // where the f*** is ternary operator?
-    // The language designers won't give me the ternary operator? - Okay, I'll do it in creepy way!
+    paddedSize := blockSize * (dividend / blockSize + 1)
 
     return &CryptoState{
         blockSize,
