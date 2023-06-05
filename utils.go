@@ -13,3 +13,5 @@ func throw(msg string) { // Gimme optional/nullable function parameters
     debug.PrintStack()
     os.Exit(1)
 } // No throw keyword? - I'll define a creepy alternative to it!
+
+func justThrow() { throw("") }

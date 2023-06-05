@@ -3,11 +3,11 @@ package main
 
 import "unsafe"
 
-const MessageHeadSize = 4 * 4 + 8 // 24
-const MessageBodySize = 1 << 10 // 1024
-const MessageSize = MessageHeadSize + MessageBodySize // 1048
-const IntSize = 4 // Gimme the private (file-scope) modifier, ASAP!
-const LongSize = 8 // At least the private modifier as I need the protected and package-private/internal modifiers too
+const _MessageHeadSize = 4 * 4 + 8 // 24
+const _MessageBodySize = 1 << 10 // 1024
+const _MessageSize = _MessageHeadSize + _MessageBodySize // 1048
+const _IntSize = 4 // Gimme the private (file-scope) modifier, ASAP!
+const _LongSize = 8 // At least the private modifier as I need the protected and package-private/internal modifiers too
 
 type Message struct {
     flag int32
@@ -15,33 +15,33 @@ type Message struct {
     size uint32
     index uint32
     count uint32
-    body [MessageBodySize]byte
+    body [_MessageBodySize]byte
 }
 
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
-func (message *Message) pack() []byte {
-    bytes := make([]byte, MessageSize)
+func (message *Message) _pack() []byte {
+    bytes := make([]byte, _MessageSize)
 
-    copy(unsafe.Slice(&(bytes[0]), IntSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), IntSize))
-    copy(unsafe.Slice(&(bytes[IntSize]), LongSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.timestamp))), LongSize))
-    copy(unsafe.Slice(&(bytes[IntSize + LongSize]), IntSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), IntSize))
-    copy(unsafe.Slice(&(bytes[IntSize * 2 + LongSize]), IntSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), IntSize))
-    copy(unsafe.Slice(&(bytes[IntSize * 3 + LongSize]), IntSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), IntSize))
+    copy(unsafe.Slice(&(bytes[0]), _IntSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), _IntSize))
+    copy(unsafe.Slice(&(bytes[_IntSize]), _LongSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.timestamp))), _LongSize))
+    copy(unsafe.Slice(&(bytes[_IntSize+_LongSize]), _IntSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), _IntSize))
+    copy(unsafe.Slice(&(bytes[_IntSize* 2 +_LongSize]), _IntSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), _IntSize))
+    copy(unsafe.Slice(&(bytes[_IntSize* 3 +_LongSize]), _IntSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), _IntSize))
 
-    copy(unsafe.Slice(&(bytes[MessageHeadSize]), MessageBodySize), unsafe.Slice(&(message.body[0]), MessageBodySize))
+    copy(unsafe.Slice(&(bytes[_MessageHeadSize]), _MessageBodySize), unsafe.Slice(&(message.body[0]), _MessageBodySize))
     return bytes
 }
 
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
-func unpackMessage(bytes []byte) *Message {
+func _unpackMessage(bytes []byte) *Message {
     message := new(Message) // TODO: generics
 
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), IntSize), unsafe.Slice(&(bytes[0]), IntSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.timestamp))), LongSize), unsafe.Slice(&(bytes[IntSize]), LongSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), IntSize), unsafe.Slice(&(bytes[IntSize + LongSize]), IntSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), IntSize), unsafe.Slice(&(bytes[IntSize * 2 + LongSize]), IntSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), IntSize), unsafe.Slice(&(bytes[IntSize * 3 + LongSize]), IntSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), _IntSize), unsafe.Slice(&(bytes[0]), _IntSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.timestamp))), _LongSize), unsafe.Slice(&(bytes[_IntSize]), _LongSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), _IntSize), unsafe.Slice(&(bytes[_IntSize+_LongSize]), _IntSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), _IntSize), unsafe.Slice(&(bytes[_IntSize* 2 +_LongSize]), _IntSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), _IntSize), unsafe.Slice(&(bytes[_IntSize* 3 +_LongSize]), _IntSize))
 
-    copy(unsafe.Slice(&(message.body[0]), MessageBodySize), unsafe.Slice(&(bytes[MessageHeadSize]), MessageBodySize))
+    copy(unsafe.Slice(&(message.body[0]), _MessageBodySize), unsafe.Slice(&(bytes[_MessageHeadSize]), _MessageBodySize))
     return message
 }

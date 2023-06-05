@@ -19,27 +19,27 @@ func main() {
     fmt.Println(len(encrypted)) // TODO: need to implement padding addition/removing
 
     cryptState := newCryptoState(16, 1048)
-    padded := cryptState.addPadding(make([]byte, 1048))
+    padded := cryptState._addPadding(make([]byte, 1048))
     fmt.Println(len(padded))
     for _, j := range padded { fmt.Printf("%d ", j) }
     fmt.Println() // TODO: it works!
 
     msg := Message{ // TODO: test only
-        flag: 0x7fffffff,
+        flag:      0x7fffffff,
         timestamp: 0,
-        size: MessageBodySize,
-        index: 0,
-        count: 1,
-        body: [MessageBodySize]byte{},
+        size:      _MessageBodySize,
+        index:     0,
+        count:     1,
+        body:      [_MessageBodySize]byte{},
     }
     for i, j := range "Test connection" { msg.body[i] = byte(j) }
 
-    packed := msg.pack() // TODO: test only
+    packed := msg._pack() // TODO: test only
     for _, i := range packed { fmt.Printf("%d ", i) }
     fmt.Println()
-    unpacked := unpackMessage(packed)
+    unpacked := _unpackMessage(packed)
     fmt.Println(unpacked.flag, unpacked.timestamp, unpacked.size, unpacked.index, unpacked.count, string(unpacked.body[:]))
-    //return // TODO: pack also works
+    //return // TODO: _pack also works
 
     server, err := net.Listen("tcp", "localhost:8080")
     if err != nil { throw("error listening" + err.Error()) }
@@ -71,12 +71,12 @@ func processClient(connection net.Conn, serverKeys sodium.KXKP) {
     if err2 != nil { throw("error creating session keys " + err.Error()) }
 
     // trying to read client's message
-    clientMessageBuffer := make([]byte, MessageSize)
+    clientMessageBuffer := make([]byte, _MessageSize)
     var n = 0
     for n == 0 { n, err = connection.Read(clientMessageBuffer)}
     for _, i := range clientMessageBuffer { fmt.Printf("%d ", i) }
     fmt.Println()
-    msg := unpackMessage(clientMessageBuffer)
+    msg := _unpackMessage(clientMessageBuffer)
     fmt.Println(msg.flag, msg.timestamp, msg.size, msg.index, msg.count, string(msg.body[:])) // TODO: unpack works
 
     //fmt.Println("rx:") // TODO: test only
