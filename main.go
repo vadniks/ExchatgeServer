@@ -19,7 +19,10 @@ func main() {
     fmt.Println(len(encrypted)) // TODO: need to implement padding addition/removing
 
     cryptState := newCryptoState(16, 1048)
-    fmt.Println(len(cryptState.addPadding(make([]byte, 1048))))
+    padded := cryptState.addPadding(make([]byte, 1048))
+    fmt.Println(len(padded))
+    for _, j := range padded { fmt.Printf("%d ", j) }
+    fmt.Println() // TODO: it works!
 
     msg := Message{ // TODO: test only
         flag: 0x7fffffff,
