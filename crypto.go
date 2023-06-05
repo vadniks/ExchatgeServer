@@ -12,7 +12,7 @@ import (
 )
 
 const PublicKeySize uint = 32
-const _MacSize uint = 16 // where the f*** is private modifier? Absence of the private modifier is so dumb, and I f***'n hate it!
+const _MacSize uint = 16 // where the f*** is private modifier? Absence of the private modifier is so dumb, and I f***in' hate it!
 const _NonceSize uint = 24 // consider anything that starts with an underscore is file-private
 const _SessionKeySize = PublicKeySize
 
@@ -72,4 +72,17 @@ func (state *CryptoState) encrypt(bytes []byte) []byte {
     copy(unsafe.Slice(&(encrypted[bytesLength]), _NonceSize), nonce.Bytes)
 
     return encrypted
+}
+
+func (state *CryptoState) decrypt(bytes []byte) []byte {
+    bytesLength := len(bytes)
+    if uint(bytesLength) != state._paddedSize { justThrow() }
+
+    encryptedWithoutNonceSize := state.encryptedSize - _NonceSize
+
+    nonce := sodium.SecretBoxNonce{Bytes: sodium.Bytes(bytes[:encryptedWithoutNonceSize])}
+    key := sodium.SecretBoxKey(state._sessionKeys.PublicKey)
+    decrypted, err := sodium.Bytes(bytes[encryptedWithoutNonceSize:]).SecretBoxOpen(nonce, key)
+
+    if err != nil { return decrypted } else { return nil }
 }
