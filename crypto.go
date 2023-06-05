@@ -4,11 +4,12 @@ package main
 // #cgo pkg-config: libsodium
 // #include <stdlib.h>
 // #include <sodium.h>
-import "C"
+import "C" // jamesruan/sodium doesn't have sodium_pad and sodium_unpad functions so the native implementation will be used directly
+
 import (
     "github.com/jamesruan/sodium"
     "unsafe"
-) // jamesruan/sodium doesn't have sodium_pad and sodium_unpad functions, here goes my favourite C!
+)
 
 const PublicKeySize uint = 32
 const _MacSize uint = 16 // where the f*** is private modifier? Absence of the private modifier is so dumb, and I f***'n hate it!
