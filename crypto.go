@@ -39,6 +39,8 @@ func newCryptoState(blockSize uint, unpaddedSize uint) *CryptoState {
     }
 }
 
+func (state *CryptoState) encrypt(bytes []byte) []byte { return state._encrypt(state._addPadding(bytes)) }
+
 func (state *CryptoState) _addPadding(bytes []byte) []byte {
     if uint(len(bytes)) != state.unpaddedSize { justThrow() }
 
@@ -58,7 +60,7 @@ func (state *CryptoState) _addPadding(bytes []byte) []byte {
    return padded
 }
 
-func (state *CryptoState) encrypt(bytes []byte) []byte {
+func (state *CryptoState) _encrypt(bytes []byte) []byte {
     bytesLength := len(bytes)
     if uint(bytesLength) != state._paddedSize { justThrow() }
 
@@ -74,7 +76,9 @@ func (state *CryptoState) encrypt(bytes []byte) []byte {
     return encrypted
 }
 
-func (state *CryptoState) decrypt(bytes []byte) []byte {
+func (state *CryptoState) decrypt(bytes []byte) []byte { return state._removePadding(state._decrypt(bytes)) }
+
+func (state *CryptoState) _decrypt(bytes []byte) []byte {
     bytesLength := len(bytes)
     if uint(bytesLength) != state._paddedSize { justThrow() }
 
@@ -85,4 +89,8 @@ func (state *CryptoState) decrypt(bytes []byte) []byte {
     decrypted, err := sodium.Bytes(bytes[encryptedWithoutNonceSize:]).SecretBoxOpen(nonce, key)
 
     if err != nil { return decrypted } else { return nil }
+}
+
+func (state *CryptoState) _removePadding(bytes []byte) []byte {
+    return nil // TODO
 }
