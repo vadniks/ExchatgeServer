@@ -44,20 +44,20 @@ func (state *CryptoState) encrypt(bytes []byte) []byte { return state._encrypt(s
 func (state *CryptoState) _addPadding(bytes []byte) []byte {
     if uint(len(bytes)) != state.unpaddedSize { justThrow() }
 
-   padded := make([]byte, state._paddedSize)
-   copy(padded, bytes)
+    padded := make([]byte, state._paddedSize)
+    copy(padded, bytes)
 
-   var generatedPaddedSize uint64
-   if C.sodium_pad(
-       (*C.ulong) (&generatedPaddedSize),
-       (*C.uchar) (&padded[0]),
-       (C.ulong) (state.unpaddedSize),
-       (C.ulong) (state.blockSize),
-       (C.ulong) (state._paddedSize),
-   ) != 0 { return nil }
+    var generatedPaddedSize uint64
+    if C.sodium_pad(
+        (*C.ulong) (&generatedPaddedSize),
+        (*C.uchar) (&padded[0]),
+        (C.ulong) (state.unpaddedSize),
+        (C.ulong) (state.blockSize),
+        (C.ulong) (state._paddedSize),
+    ) != 0 { return nil }
 
-   if generatedPaddedSize != uint64(state._paddedSize) { return nil }
-   return padded
+    if generatedPaddedSize != uint64(state._paddedSize) { return nil }
+    return padded
 }
 
 func (state *CryptoState) _encrypt(bytes []byte) []byte {
@@ -80,13 +80,13 @@ func (state *CryptoState) decrypt(bytes []byte) []byte { return state._removePad
 
 func (state *CryptoState) _decrypt(bytes []byte) []byte {
     bytesLength := len(bytes)
-    if uint(bytesLength) != state._paddedSize { justThrow() }
+    if uint(bytesLength) != state.encryptedSize { justThrow() }
 
     encryptedWithoutNonceSize := state.encryptedSize - _NonceSize
 
-    nonce := sodium.SecretBoxNonce{Bytes: sodium.Bytes(bytes[:encryptedWithoutNonceSize])}
+    nonce := sodium.SecretBoxNonce{Bytes: sodium.Bytes(bytes[encryptedWithoutNonceSize:])}
     key := sodium.SecretBoxKey(state._sessionKeys.PublicKey)
-    decrypted, err := sodium.Bytes(bytes[encryptedWithoutNonceSize:]).SecretBoxOpen(nonce, key)
+    decrypted, err := sodium.Bytes(bytes[:encryptedWithoutNonceSize]).SecretBoxOpen(nonce, key)
 
     if err != nil { return decrypted } else { return nil }
 }

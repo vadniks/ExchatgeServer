@@ -15,8 +15,8 @@ func main() {
     length := len(key)
     for i := length; i < 32; i++ { key = append(key, 0) }
 
-    encrypted := sodium.Bytes("Encrypted").SecretBox(nonce, sodium.SecretBoxKey{Bytes: key}) // TODO: test only
-    fmt.Println(len(encrypted))
+    //encrypted := sodium.Bytes("Encrypted").SecretBox(nonce, sodium.SecretBoxKey{Bytes: key}) // TODO: test only
+    //fmt.Println(len(encrypted))
 
     cryptState := newCryptoState(16, 1048) // TODO: test only
     padded := cryptState._addPadding(make([]byte, 1048))
@@ -27,39 +27,56 @@ func main() {
     unpadded := cryptState._removePadding(padded) // TODO: test only
     fmt.Println(len(unpadded))
     for _, j := range unpadded { fmt.Printf("%d ", j) }
+    fmt.Println() // TODO: works
+
+    msg := []byte("Test") // TODO: test only
+    for i := len(msg); i < int(cryptState._paddedSize); i++ { msg = append(msg, 0) }
+    fmt.Println("bb")
+    for _, j := range msg { fmt.Printf("%d ", j) }
     fmt.Println()
 
-    return
+    fmt.Println("aa ", len(msg)) // TODO: test only
+    encrypted := cryptState._encrypt(msg)
+    fmt.Println(len(encrypted))
+    for _, j := range encrypted { fmt.Printf("%d ", j) }
+    fmt.Println() // TODO: seems that this doesn't work properly too
 
-    msg := Message{ // TODO: test only
-        flag:      0x7fffffff,
-        timestamp: 0,
-        size:      _MessageBodySize,
-        index:     0,
-        count:     1,
-        body:      [_MessageBodySize]byte{},
-    }
-    for i, j := range "Test connection" { msg.body[i] = byte(j) }
+    decrypted := cryptState._decrypt(encrypted) // TODO: test only
+    fmt.Println(len(decrypted))
+    for _, j := range decrypted { fmt.Printf("%d ", j) }
+    fmt.Println() // TODO: doesn't work properly
 
-    packed := msg._pack() // TODO: test only
-    for _, i := range packed { fmt.Printf("%d ", i) }
-    fmt.Println()
-    unpacked := _unpackMessage(packed)
-    fmt.Println(unpacked.flag, unpacked.timestamp, unpacked.size, unpacked.index, unpacked.count, string(unpacked.body[:]))
-    //return // TODO: _pack also works
+    return // TODO: test only
 
-    server, err := net.Listen("tcp", "localhost:8080")
-    if err != nil { throw("error listening" + err.Error()) }
-
-    defer server.Close()
-
-    var serverKeys = sodium.MakeKXKP()
-
-    //for { // The only loop that exists in this language is the for loop - seriously? where the f*** is the wile loop?
-        connection, err := server.Accept()
-        if err != nil { throw("error accepting " + err.Error()) }
-        /*go*/ processClient(connection, serverKeys)
+    //msg := Message{ // TODO: test only
+    //    flag:      0x7fffffff,
+    //    timestamp: 0,
+    //    size:      _MessageBodySize,
+    //    index:     0,
+    //    count:     1,
+    //    body:      [_MessageBodySize]byte{},
     //}
+    //for i, j := range "Test connection" { msg.body[i] = byte(j) }
+    //
+    //packed := msg._pack() // TODO: test only
+    //for _, i := range packed { fmt.Printf("%d ", i) }
+    //fmt.Println()
+    //unpacked := _unpackMessage(packed)
+    //fmt.Println(unpacked.flag, unpacked.timestamp, unpacked.size, unpacked.index, unpacked.count, string(unpacked.body[:]))
+    ////return // TODO: _pack also works
+    //
+    //server, err := net.Listen("tcp", "localhost:8080")
+    //if err != nil { throw("error listening" + err.Error()) }
+    //
+    //defer server.Close()
+    //
+    //var serverKeys = sodium.MakeKXKP()
+    //
+    ////for { // The only loop that exists in this language is the for loop - seriously? where the f*** is the wile loop?
+    //    connection, err := server.Accept()
+    //    if err != nil { throw("error accepting " + err.Error()) }
+    //    /*go*/ processClient(connection, serverKeys)
+    ////}
 }
 
 func processClient(connection net.Conn, serverKeys sodium.KXKP) {
