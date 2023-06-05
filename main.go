@@ -18,6 +18,9 @@ func main() {
     encrypted := sodium.Bytes("Encrypted").SecretBox(nonce, sodium.SecretBoxKey{Bytes: key}) // TODO: test only
     fmt.Println(len(encrypted)) // TODO: need to implement padding addition/removing
 
+    cryptState := newCryptoState(16, 1048)
+    fmt.Println(len(cryptState.addPadding(make([]byte, 1048))))
+
     msg := Message{ // TODO: test only
         flag: 0x7fffffff,
         timestamp: 0,
