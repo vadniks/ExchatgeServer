@@ -18,7 +18,7 @@ type Message struct {
     body [MessageBodySize]byte
 }
 
-//goland:noinspection GoRedundantConversion (*byte)
+//goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
 func (message *Message) pack() []byte {
     bytes := make([]byte, MessageSize)
 
@@ -32,7 +32,7 @@ func (message *Message) pack() []byte {
     return bytes
 }
 
-//goland:noinspection GoRedundantConversion (*byte)
+//goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
 func unpackMessage(bytes []byte) *Message {
     message := new(Message) // TODO: generics
 
