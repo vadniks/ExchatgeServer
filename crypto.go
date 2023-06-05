@@ -1,8 +1,6 @@
 
 package main
 
-import "errors"
-
 const PublicKeySize uint = 32
 const MacSize uint = 16 // where the f*** is private modifier?
 const NonceSize uint = 24
@@ -15,7 +13,7 @@ type CryptoState struct {
 }
 
 func newCryptState(blockSize uint, unpaddedSize uint) *CryptoState {
-    if blockSize == 0 || unpaddedSize == 0 { _ = errors.New("") } // where the f*** is throw keyword?
+    if blockSize == 0 || unpaddedSize == 0 { throw("") } // where the f*** is throw keyword?
 
     dividend := unpaddedSize + 1 // where the f*** are runtime constants?
     paddedSize := blockSize * (dividend / blockSize +

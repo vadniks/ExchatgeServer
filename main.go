@@ -5,13 +5,7 @@ import (
     "fmt"
     "github.com/jamesruan/sodium"
     "net"
-    "os"
 )
-
-func errorExit(msg string) {
-    fmt.Fprintln(os.Stderr, msg)
-    os.Exit(1)
-}
 
 func main() {
     msg := Message{ // TODO: test only
@@ -32,15 +26,15 @@ func main() {
     //return // TODO: pack also works
 
     server, err := net.Listen("tcp", "localhost:8080")
-    if err != nil { errorExit("error listening" + err.Error()) }
+    if err != nil { throw("error listening" + err.Error()) }
 
     defer server.Close()
 
     var serverKeys = sodium.MakeKXKP()
 
-    //for {
+    //for { // The only loop that exists in this language is the for loop - seriously? where the f*** is the wile loop?
         connection, err := server.Accept()
-        if err != nil { errorExit("error accepting " + err.Error()) }
+        if err != nil { throw("error accepting " + err.Error()) }
         /*go*/ processClient(connection, serverKeys)
     //}
 }
@@ -48,17 +42,17 @@ func main() {
 func processClient(connection net.Conn, serverKeys sodium.KXKP) {
     // sending server's public key
     _, err := connection.Write(serverKeys.PublicKey.Bytes)
-    if err != nil { errorExit("error sending public key " + err.Error()) }
+    if err != nil { throw("error sending public key " + err.Error()) }
 
     // receiving client's public key
     clientPublicKeyBuffer := make([]byte, serverKeys.PublicKey.Size())
     _, err = connection.Read(clientPublicKeyBuffer)
-    if err != nil { errorExit("error reading " + err.Error()) }
+    if err != nil { throw("error reading " + err.Error()) }
 
     // generating session keys
     var clientPublicKey = sodium.KXPublicKey{Bytes: clientPublicKeyBuffer}
     var _/*sessionKeys*/, err2 = serverKeys.ServerSessionKeys(clientPublicKey)
-    if err2 != nil { errorExit("error creating session keys " + err.Error()) }
+    if err2 != nil { throw("error creating session keys " + err.Error()) }
 
     // trying to read client's message
     clientMessageBuffer := make([]byte, MessageSize)
