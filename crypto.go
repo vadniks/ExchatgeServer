@@ -4,17 +4,23 @@ package main
 // #cgo pkg-config: libsodium
 // #include <stdlib.h>
 // #include <sodium.h>
-import "C" // jamesruan/sodium doesn't have sodium_pad and sodium_unpad functions, here goes my favourite C!
+import "C"
+import (
+    "github.com/jamesruan/sodium"
+    "unsafe"
+) // jamesruan/sodium doesn't have sodium_pad and sodium_unpad functions, here goes my favourite C!
 
 const PublicKeySize uint = 32
 const _MacSize uint = 16 // where the f*** is private modifier? Absence of the private modifier is so dumb, and I f***'n hate it!
 const _NonceSize uint = 24 // consider anything that starts with an underscore is file-private
+const _SessionKeySize = PublicKeySize
 
 type CryptoState struct {
     blockSize uint
     unpaddedSize  uint
     _paddedSize   uint
     encryptedSize uint
+    _sessionKeys sodium.KXKP
 }
 
 func newCryptoState(blockSize uint, unpaddedSize uint) *CryptoState {
@@ -30,6 +36,7 @@ func newCryptoState(blockSize uint, unpaddedSize uint) *CryptoState {
         unpaddedSize,
         paddedSize,
         paddedSize + _MacSize + _NonceSize,
+        sodium.MakeKXKP(),
     }
 }
 
@@ -52,6 +59,18 @@ func (state *CryptoState) _addPadding(bytes []byte) []byte {
    return padded
 }
 
-//func (state *CryptoState) encrypt(bytes []byte) []byte {
-//    if uint(len(bytes)) !=
-//}
+func (state *CryptoState) encrypt(bytes []byte) []byte {
+    bytesLength := len(bytes)
+    if uint(bytesLength) != state._paddedSize { justThrow() }
+
+    nonce := sodium.SecretBoxNonce{}
+    sodium.Randomize(&nonce)
+
+    ciphered := sodium.Bytes(bytes).SecretBox(nonce, sodium.SecretBoxKey(state._sessionKeys.SecretKey))
+    encrypted := make([]byte, state.encryptedSize)
+
+    copy(encrypted, ciphered)
+    copy(unsafe.Slice(&(encrypted[bytesLength]), _NonceSize), nonce.Bytes)
+
+    return encrypted
+}
