@@ -29,7 +29,7 @@ func main() {
     fmt.Println()
     unpacked := unpackMessage(packed)
     fmt.Println(unpacked.flag, unpacked.timestamp, unpacked.size, unpacked.index, unpacked.count, string(unpacked.body[:]))
-    return // TODO: pack also works
+    //return // TODO: pack also works
 
     server, err := net.Listen("tcp", "localhost:8080")
     if err != nil { errorExit("error listening" + err.Error()) }

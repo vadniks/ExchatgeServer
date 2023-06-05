@@ -7,8 +7,8 @@ const MessageHeadSize = 4 * 4 + 8 // 24
 const MessageBodySize = 1 << 10 // 1024
 const MessageSize = MessageHeadSize + MessageBodySize // 1048
 const ReceiveBufferSize = 1096 // TODO: encryptedSize
-const intSize = 4
-const longSize = 8
+const IntSize = 4 // Gimme the private (file-scope) modifier, ASAP!
+const LongSize = 8 // At least the private modifier as I need the protected and package-private/internal modifiers too
 
 type Message struct {
     flag int32
@@ -23,11 +23,11 @@ type Message struct {
 func (message *Message) pack() []byte {
     bytes := make([]byte, MessageSize)
 
-    copy(unsafe.Slice(&(bytes[0]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize]), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.timestamp))), longSize))
-    copy(unsafe.Slice(&(bytes[intSize + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), intSize))
+    copy(unsafe.Slice(&(bytes[0]), IntSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), IntSize))
+    copy(unsafe.Slice(&(bytes[IntSize]), LongSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.timestamp))), LongSize))
+    copy(unsafe.Slice(&(bytes[IntSize+LongSize]), IntSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), IntSize))
+    copy(unsafe.Slice(&(bytes[IntSize* 2 +LongSize]), IntSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), IntSize))
+    copy(unsafe.Slice(&(bytes[IntSize* 3 +LongSize]), IntSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), IntSize))
 
     copy(unsafe.Slice(&(bytes[MessageHeadSize]), MessageBodySize), unsafe.Slice(&(message.body[0]), MessageBodySize))
     return bytes
@@ -35,13 +35,13 @@ func (message *Message) pack() []byte {
 
 //goland:noinspection GoRedundantConversion (*byte)
 func unpackMessage(bytes []byte) *Message {
-    message := &Message{}
+    message := new(Message) // TODO: generics
 
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), intSize), unsafe.Slice(&(bytes[0]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.timestamp))), longSize), unsafe.Slice(&(bytes[intSize]), longSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), intSize), unsafe.Slice(&(bytes[intSize + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), intSize), unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), intSize), unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), IntSize), unsafe.Slice(&(bytes[0]), IntSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.timestamp))), LongSize), unsafe.Slice(&(bytes[IntSize]), LongSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), IntSize), unsafe.Slice(&(bytes[IntSize+LongSize]), IntSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), IntSize), unsafe.Slice(&(bytes[IntSize* 2 +LongSize]), IntSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), IntSize), unsafe.Slice(&(bytes[IntSize* 3 +LongSize]), IntSize))
 
     copy(unsafe.Slice(&(message.body[0]), MessageBodySize), unsafe.Slice(&(bytes[MessageHeadSize]), MessageBodySize))
     return message
