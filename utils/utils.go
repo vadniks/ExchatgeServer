@@ -14,3 +14,5 @@ func throw(msg string) {
 }
 
 func JustThrow() { throw("") }
+
+func Assert(condition bool) { if !condition { JustThrow() } }

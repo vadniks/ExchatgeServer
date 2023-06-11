@@ -23,11 +23,29 @@ type crypto struct {
     unpaddedSize uint
     paddedSize uint
     encryptedSize uint
-    sessionKeys sodium.KXKP
+    serverKeys sodium.KXKP
 }
 
-func Initialize(blockSize uint, unpaddedSize uint) {
-    if blockSize == 0 || unpaddedSize == 0 { utils.JustThrow() }
+type KeyPair struct {
+    Key1 []byte // public key or receive key
+    Key2 []byte // secret key or send key
+}
+
+func PublicAndSecretKeys(publicKey []byte, secretKey []byte) *KeyPair { return &KeyPair{Key1: publicKey, Key2: secretKey} }
+func SessionKeys(receiveKey []byte, sendKey []byte) *KeyPair { return &KeyPair{Key1: receiveKey, Key2: sendKey} }
+
+func (keys *KeyPair) publicKey() []byte { return keys.Key1 }
+func (keys *KeyPair) secretKey() []byte { return keys.Key2 }
+func (keys *KeyPair) receiveKey() []byte { return keys.Key1 }
+func (keys *KeyPair) sendKey() []byte { return keys.Key2 }
+
+func GenerateServerKeys() *KeyPair {
+    keys := sodium.MakeKXKP()
+    return PublicAndSecretKeys(keys.PublicKey.Bytes, keys.SecretKey.Bytes)
+}
+
+func Initialize(serverKeys KeyPair, blockSize uint, unpaddedSize uint) {
+    utils.Assert(blockSize == 0 || unpaddedSize == 0)
 
     dividend := unpaddedSize + 1
     paddedSize := blockSize * (dividend / blockSize + 1)
@@ -37,14 +55,26 @@ func Initialize(blockSize uint, unpaddedSize uint) {
         unpaddedSize,
         paddedSize,
         paddedSize + macSize + nonceSize,
-        sodium.MakeKXKP(),
+        sodium.KXKP{
+            PublicKey: sodium.KXPublicKey{Bytes: serverKeys.publicKey()},
+            SecretKey: sodium.KXSecretKey{Bytes: serverKeys.secretKey()},
+        },
     }
 }
 
-func Encrypt(bytes []byte) []byte { return encrypt(addPadding(bytes)) }
+func GenerateSessionKeys(clientPublicKey []byte) *KeyPair {
+    utils.Assert(len(clientPublicKey) == int(PublicKeySize))
+    keys, err := this.serverKeys.ServerSessionKeys(sodium.KXPublicKey{Bytes: clientPublicKey})
+
+    return func() *KeyPair {
+        if err != nil { return nil } else { return SessionKeys(keys.Rx.Bytes, keys.Tx.Bytes) }
+    }()
+}
+
+func Encrypt(sessionKeys *KeyPair, bytes []byte) []byte { return encrypt(addPadding(bytes), sessionKeys.sendKey()) }
 
 func addPadding(bytes []byte) []byte {
-    if uint(len(bytes)) != this.unpaddedSize { utils.JustThrow() }
+    utils.Assert(uint(len(bytes)) != this.unpaddedSize)
 
     padded := make([]byte, this.paddedSize)
     copy(padded, bytes)
@@ -62,14 +92,14 @@ func addPadding(bytes []byte) []byte {
     return padded
 }
 
-func encrypt(bytes []byte) []byte {
+func encrypt(bytes []byte, key []byte) []byte {
     bytesLength := len(bytes)
-    if uint(bytesLength) != this.paddedSize { utils.JustThrow() }
+    utils.Assert(uint(bytesLength) != this.paddedSize && len(key) == int(sessionKeySize))
 
     nonce := sodium.SecretBoxNonce{}
     sodium.Randomize(&nonce)
 
-    ciphered := sodium.Bytes(bytes).SecretBox(nonce, sodium.SecretBoxKey{Bytes: this.sessionKeys.SecretKey.Bytes})
+    ciphered := sodium.Bytes(bytes).SecretBox(nonce, sodium.SecretBoxKey{Bytes: key})
     encrypted := make([]byte, this.encryptedSize)
 
     copy(encrypted, ciphered)
@@ -78,23 +108,23 @@ func encrypt(bytes []byte) []byte {
     return encrypted
 }
 
-func Decrypt(bytes []byte) []byte { return removePadding(decrypt(bytes)) }
+func Decrypt(sessionKeys *KeyPair, bytes []byte) []byte { return removePadding(decrypt(bytes, sessionKeys.receiveKey())) }
 
-func decrypt(bytes []byte) []byte {
+func decrypt(bytes []byte, key []byte) []byte {
     bytesLength := len(bytes)
-    if uint(bytesLength) != this.encryptedSize { utils.JustThrow() }
+    utils.Assert(uint(bytesLength) != this.encryptedSize)
 
     encryptedWithoutNonceSize := this.encryptedSize - nonceSize
 
     nonce := sodium.SecretBoxNonce{Bytes: sodium.Bytes(bytes[encryptedWithoutNonceSize:])}
-    key := sodium.SecretBoxKey{Bytes: this.sessionKeys.SecretKey.Bytes}
+    boxKey := sodium.SecretBoxKey{Bytes: key}
 
-    decrypted, err := sodium.Bytes(bytes[:encryptedWithoutNonceSize]).SecretBoxOpen(nonce, key)
+    decrypted, err := sodium.Bytes(bytes[:encryptedWithoutNonceSize]).SecretBoxOpen(nonce, boxKey)
     if err == nil { return decrypted } else { return nil }
 }
 
 func removePadding(bytes []byte) []byte {
-    if uint(len(bytes)) != this.paddedSize { utils.JustThrow() }
+    utils.Assert(uint(len(bytes)) != this.paddedSize)
 
     padded := make([]byte, this.paddedSize)
     copy(padded, bytes)
