@@ -117,8 +117,11 @@ func processClient(connection *goNet.Conn, waitGroup *sync.WaitGroup, onShutDown
     for {
         if receive(connection, messageBuffer) {
             switch processClientMessage(connection, sessionKeys, messageBuffer) {
-                case clientMessageFinish: waitGroup.Done(); return
-                case clientMessageProceed: break
+                case clientMessageFinish:
+                    waitGroup.Done()
+                    return
+                case clientMessageProceed:
+                    break
                 case clientMessageShutdown:
                     waitGroup.Done()
                     (*onShutDownRequested)()// TODO: verify client's administrative rights to allow requesting shutdown
