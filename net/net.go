@@ -161,7 +161,7 @@ func processClientMessage(connection *goNet.Conn, sessionKeys *crypto.KeyPair, m
         1,
         [messageBodySize]byte{},
     }
-    for i, _ := range test2.body { test2.body[i] = 1 }
+    for i, _ := range test2.body { test2.body[i] = 'a' }
     send(connection, crypto.Encrypt(sessionKeys, test2.pack()))
 
     return clientMessageShutdown
