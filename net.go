@@ -6,8 +6,8 @@ import "unsafe"
 const _MessageHeadSize = 4 * 4 + 8 // 24
 const _MessageBodySize = 1 << 10 // 1024
 const _MessageSize = _MessageHeadSize + _MessageBodySize // 1048
-const _IntSize = 4 // Gimme the private (file-scope) modifier, ASAP!
-const _LongSize = 8 // At least the private modifier as I need the protected and package-private/internal modifiers too
+const _IntSize = 4
+const _LongSize = 8
 
 type Message struct {
     flag int32

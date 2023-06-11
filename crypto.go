@@ -4,17 +4,16 @@ package main
 // #cgo pkg-config: libsodium
 // #include <stdlib.h>
 // #include <sodium.h>
-import "C" // jamesruan/sodium doesn't have sodium_pad and sodium_unpad functions so the native implementation will be used directly
+import "C"
 
 import (
-    "fmt"
     "github.com/jamesruan/sodium"
     "unsafe"
 )
 
 const PublicKeySize uint = 32
-const _MacSize uint = 16 // where the f*** is private modifier? Absence of the private modifier is so dumb, and I f***in' hate it!
-const _NonceSize uint = 24 // consider anything that starts with an underscore is file-private
+const _MacSize uint = 16
+const _NonceSize uint = 24
 const _SessionKeySize = PublicKeySize
 
 type CryptoState struct {
@@ -26,9 +25,9 @@ type CryptoState struct {
 }
 
 func newCryptoState(blockSize uint, unpaddedSize uint) *CryptoState {
-    if blockSize == 0 || unpaddedSize == 0 { justThrow() } // where the f*** is throw keyword?
+    if blockSize == 0 || unpaddedSize == 0 { justThrow() }
 
-    dividend := unpaddedSize + 1 // where the f*** are runtime constants?
+    dividend := unpaddedSize + 1
     paddedSize := blockSize * (dividend / blockSize + 1)
 
     return &CryptoState{
@@ -40,7 +39,7 @@ func newCryptoState(blockSize uint, unpaddedSize uint) *CryptoState {
     }
 }
 
-func (state *CryptoState) encrypt(bytes []byte) []byte { return state._encrypt(state._addPadding(bytes)) } // TODO: test
+func (state *CryptoState) encrypt(bytes []byte) []byte { return state._encrypt(state._addPadding(bytes)) }
 
 func (state *CryptoState) _addPadding(bytes []byte) []byte {
     if uint(len(bytes)) != state.unpaddedSize { justThrow() }
@@ -77,7 +76,7 @@ func (state *CryptoState) _encrypt(bytes []byte) []byte {
     return encrypted
 }
 
-func (state *CryptoState) decrypt(bytes []byte) []byte { return state._removePadding(state._decrypt(bytes)) } // TODO: test
+func (state *CryptoState) decrypt(bytes []byte) []byte { return state._removePadding(state._decrypt(bytes)) }
 
 func (state *CryptoState) _decrypt(bytes []byte) []byte {
     bytesLength := len(bytes)
@@ -85,14 +84,10 @@ func (state *CryptoState) _decrypt(bytes []byte) []byte {
 
     encryptedWithoutNonceSize := state.encryptedSize - _NonceSize
 
-    a := []byte{1, 2, 3, 4, 5} // TODO: test only
-    fmt.Println("@", a[3:], a[:3])
-
     nonce := sodium.SecretBoxNonce{Bytes: sodium.Bytes(bytes[encryptedWithoutNonceSize:])}
     key := sodium.SecretBoxKey{Bytes: state._sessionKeys.SecretKey.Bytes}
-    decrypted, err := sodium.Bytes(bytes[:encryptedWithoutNonceSize]).SecretBoxOpen(nonce, key)
-    fmt.Println("rsedfe ", len(bytes[:encryptedWithoutNonceSize])) // TODO: test only
 
+    decrypted, err := sodium.Bytes(bytes[:encryptedWithoutNonceSize]).SecretBoxOpen(nonce, key)
     if err == nil { return decrypted } else { return nil }
 }
 
