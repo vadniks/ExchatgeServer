@@ -71,9 +71,7 @@ func ProcessClients() {
     utils.Assert(err == nil)
     defer utils.Assert(server.Close() == nil)
 
-    for {
-        // TODO
-    }
+    for { go processClient() }
 }
 
 func processClient() {
