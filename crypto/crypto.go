@@ -34,10 +34,10 @@ type KeyPair struct {
 func PublicAndSecretKeys(publicKey []byte, secretKey []byte) *KeyPair { return &KeyPair{Key1: publicKey, Key2: secretKey} }
 func SessionKeys(receiveKey []byte, sendKey []byte) *KeyPair { return &KeyPair{Key1: receiveKey, Key2: sendKey} }
 
-func (keys *KeyPair) publicKey() []byte { return keys.Key1 }
-func (keys *KeyPair) secretKey() []byte { return keys.Key2 }
-func (keys *KeyPair) receiveKey() []byte { return keys.Key1 }
-func (keys *KeyPair) sendKey() []byte { return keys.Key2 }
+func (keys *KeyPair) PublicKey() []byte { return keys.Key1 }
+func (keys *KeyPair) SecretKey() []byte { return keys.Key2 }
+func (keys *KeyPair) ReceiveKey() []byte { return keys.Key1 }
+func (keys *KeyPair) SendKey() []byte { return keys.Key2 }
 
 func GenerateServerKeys() *KeyPair {
     keys := sodium.MakeKXKP()
@@ -56,8 +56,8 @@ func Initialize(serverKeys *KeyPair, blockSize uint, unpaddedSize uint) {
         paddedSize,
         paddedSize + macSize + nonceSize,
         sodium.KXKP{
-            PublicKey: sodium.KXPublicKey{Bytes: serverKeys.publicKey()},
-            SecretKey: sodium.KXSecretKey{Bytes: serverKeys.secretKey()},
+            PublicKey: sodium.KXPublicKey{Bytes: serverKeys.PublicKey()},
+            SecretKey: sodium.KXSecretKey{Bytes: serverKeys.SecretKey()},
         },
     }
 }
@@ -71,7 +71,7 @@ func GenerateSessionKeys(clientPublicKey []byte) *KeyPair {
     }()
 }
 
-func Encrypt(sessionKeys *KeyPair, bytes []byte) []byte { return encrypt(addPadding(bytes), sessionKeys.sendKey()) }
+func Encrypt(sessionKeys *KeyPair, bytes []byte) []byte { return encrypt(addPadding(bytes), sessionKeys.SendKey()) }
 
 func addPadding(bytes []byte) []byte {
     utils.Assert(uint(len(bytes)) == this.unpaddedSize)
@@ -108,7 +108,7 @@ func encrypt(bytes []byte, key []byte) []byte {
     return encrypted
 }
 
-func Decrypt(sessionKeys *KeyPair, bytes []byte) []byte { return removePadding(decrypt(bytes, sessionKeys.receiveKey())) }
+func Decrypt(sessionKeys *KeyPair, bytes []byte) []byte { return removePadding(decrypt(bytes, sessionKeys.ReceiveKey())) }
 
 func decrypt(bytes []byte, key []byte) []byte {
     bytesLength := len(bytes)

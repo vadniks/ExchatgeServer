@@ -71,14 +71,37 @@ func ProcessClients() {
     utils.Assert(err == nil)
     defer utils.Assert(server.Close() == nil)
 
-    for { go processClient() }
+    for { go processClient(&server) } // TODO: add administrative shutdown hook
 }
 
-func processClient() {
-    clientPublicKeyBuffer := make([]byte, crypto.PublicKeySize)
-    clientPublicKeyBuffer[0] = 0 // TODO
+func processClient(server *goNet.Listener) {
+    connection, err := (*server).Accept()
+    utils.Assert(err == nil)
+    defer utils.Assert(connection.Close() == nil)
 
-    sessionKeys := crypto.GenerateSessionKeys(clientPublicKeyBuffer)
-    a := sessionKeys.Key1 // TODO
-    a[0] = 0
+    send(&connection, this.serverKeys.PublicKey())
+
+    clientPublicKey := make([]byte, crypto.PublicKeySize)
+    receive(&connection, clientPublicKey)
+    sessionKeys := crypto.GenerateSessionKeys(clientPublicKey)
+
+    messageBuffer := make([]byte, messageSize)
+    for {
+        if receive(&connection, messageBuffer) { processClientMessage(sessionKeys, messageBuffer) }
+    }
+}
+
+func send(connection *goNet.Conn, payload []byte) {
+    count, err := (*connection).Write(payload)
+    utils.Assert(count == len(payload) && err == nil)
+}
+
+func receive(connection *goNet.Conn, buffer []byte) bool {
+    count, err := (*connection).Read(buffer)
+    utils.Assert(err == nil)
+    return count == len(buffer)
+}
+
+func processClientMessage(sessionKeys *crypto.KeyPair, message []byte) {
+    
 }
