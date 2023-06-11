@@ -7,6 +7,7 @@ import (
     "fmt"
     goNet "net"
     "sync"
+    "sync/atomic"
     "unsafe"
 )
 
@@ -84,14 +85,17 @@ func ProcessClients() {
     utils.Assert(err == nil)
 
     var waitGroup sync.WaitGroup
-    acceptingClients := true
+
+    var acceptingClients atomic.Bool
+    acceptingClients.Store(true)
+
     onShutDownRequested := func() {
-        acceptingClients = false
+        acceptingClients.Store(false)
         utils.Assert(listener.Close() == nil)
         waitGroup.Wait()
     }
 
-    for acceptingClients {
+    for acceptingClients.Load() {
         connection, err := listener.Accept()
         if err != nil { break }
 
