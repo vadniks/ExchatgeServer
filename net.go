@@ -34,7 +34,7 @@ func (message *Message) _pack() []byte {
 
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
 func _unpackMessage(bytes []byte) *Message {
-    message := new(Message) // TODO: generics
+    message := new(Message)
 
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), _IntSize), unsafe.Slice(&(bytes[0]), _IntSize))
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.timestamp))), _LongSize), unsafe.Slice(&(bytes[_IntSize]), _LongSize))

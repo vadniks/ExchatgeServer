@@ -39,12 +39,12 @@ func main() {
     encrypted := cryptState._encrypt(msg)
     fmt.Println(len(encrypted))
     for _, j := range encrypted { fmt.Printf("%d ", j) }
-    fmt.Println() // TODO: seems that this doesn't work properly too
+    fmt.Println()
 
     decrypted := cryptState._decrypt(encrypted) // TODO: test only
-    fmt.Println(len(decrypted))
+    fmt.Println("d", len(decrypted))
     for _, j := range decrypted { fmt.Printf("%d ", j) }
-    fmt.Println() // TODO: doesn't work properly
+    fmt.Println() // TODO: works properly
 
     return // TODO: test only
 

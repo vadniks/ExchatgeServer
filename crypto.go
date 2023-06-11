@@ -7,6 +7,7 @@ package main
 import "C" // jamesruan/sodium doesn't have sodium_pad and sodium_unpad functions so the native implementation will be used directly
 
 import (
+    "fmt"
     "github.com/jamesruan/sodium"
     "unsafe"
 )
@@ -67,11 +68,11 @@ func (state *CryptoState) _encrypt(bytes []byte) []byte {
     nonce := sodium.SecretBoxNonce{}
     sodium.Randomize(&nonce)
 
-    ciphered := sodium.Bytes(bytes).SecretBox(nonce, sodium.SecretBoxKey(state._sessionKeys.SecretKey))
+    ciphered := sodium.Bytes(bytes).SecretBox(nonce, sodium.SecretBoxKey{Bytes: state._sessionKeys.SecretKey.Bytes})
     encrypted := make([]byte, state.encryptedSize)
 
     copy(encrypted, ciphered)
-    copy(unsafe.Slice(&(encrypted[bytesLength]), _NonceSize), nonce.Bytes)
+    copy(unsafe.Slice(&(encrypted[uint(bytesLength) + _MacSize]), _NonceSize), nonce.Bytes)
 
     return encrypted
 }
@@ -84,11 +85,15 @@ func (state *CryptoState) _decrypt(bytes []byte) []byte {
 
     encryptedWithoutNonceSize := state.encryptedSize - _NonceSize
 
-    nonce := sodium.SecretBoxNonce{Bytes: sodium.Bytes(bytes[encryptedWithoutNonceSize:])}
-    key := sodium.SecretBoxKey(state._sessionKeys.PublicKey)
-    decrypted, err := sodium.Bytes(bytes[:encryptedWithoutNonceSize]).SecretBoxOpen(nonce, key)
+    a := []byte{1, 2, 3, 4, 5} // TODO: test only
+    fmt.Println("@", a[3:], a[:3])
 
-    if err != nil { return decrypted } else { return nil }
+    nonce := sodium.SecretBoxNonce{Bytes: sodium.Bytes(bytes[encryptedWithoutNonceSize:])}
+    key := sodium.SecretBoxKey{Bytes: state._sessionKeys.SecretKey.Bytes}
+    decrypted, err := sodium.Bytes(bytes[:encryptedWithoutNonceSize]).SecretBoxOpen(nonce, key)
+    fmt.Println("rsedfe ", len(bytes[:encryptedWithoutNonceSize])) // TODO: test only
+
+    if err == nil { return decrypted } else { return nil }
 }
 
 func (state *CryptoState) _removePadding(bytes []byte) []byte {
