@@ -44,7 +44,7 @@ func GenerateServerKeys() *KeyPair {
     return PublicAndSecretKeys(keys.PublicKey.Bytes, keys.SecretKey.Bytes)
 }
 
-func Initialize(serverKeys KeyPair, blockSize uint, unpaddedSize uint) {
+func Initialize(serverKeys *KeyPair, blockSize uint, unpaddedSize uint) {
     utils.Assert(blockSize == 0 || unpaddedSize == 0)
 
     dividend := unpaddedSize + 1

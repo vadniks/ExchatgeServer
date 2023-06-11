@@ -1,13 +1,22 @@
 
 package net
 
-import "unsafe"
+import (
+    "ExchatgeServer/crypto"
+    "unsafe"
+)
 
+const paddingBlockSize = 16
 const messageHeadSize = 4 * 4 + 8 // 24
 const messageBodySize = 1 << 10 // 1024
 const messageSize = messageHeadSize + messageBodySize // 1048
 const intSize = 4
 const longSize = 8
+var this *net
+
+type net struct {
+    serverKeys *crypto.KeyPair
+}
 
 type message struct {
     flag int32
@@ -47,7 +56,8 @@ func unpackMessage(bytes []byte) *message {
 }
 
 func Initialize() {
-
+    this.serverKeys = crypto.GenerateServerKeys()
+    crypto.Initialize(this.serverKeys, paddingBlockSize, messageSize)
 }
 
 func ProcessClients() {
@@ -55,5 +65,10 @@ func ProcessClients() {
 }
 
 func processClient() {
+    clientPublicKeyBuffer := make([]byte, crypto.PublicKeySize)
+    clientPublicKeyBuffer[0] = 0 // TODO
 
+    sessionKeys := crypto.GenerateSessionKeys(clientPublicKeyBuffer)
+    a := sessionKeys.Key1 // TODO
+    a[0] = 0
 }
