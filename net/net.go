@@ -3,8 +3,8 @@ package net
 
 import "unsafe"
 
-const messageHeadSize = 4 * 4 + 8                     // 24
-const messageBodySize = 1 << 10                       // 1024
+const messageHeadSize = 4 * 4 + 8 // 24
+const messageBodySize = 1 << 10 // 1024
 const messageSize = messageHeadSize + messageBodySize // 1048
 const intSize = 4
 const longSize = 8
