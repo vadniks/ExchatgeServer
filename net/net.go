@@ -4,8 +4,8 @@ package net
 import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/utils"
-    "unsafe"
     goNet "net"
+    "unsafe"
 )
 
 const host = "localhost:8080"
@@ -59,6 +59,9 @@ func unpackMessage(bytes []byte) *message {
 }
 
 func Initialize() {
+    var byteOrderChecker uint64 = 0x0123456789abcdef // only on x64 littleEndian data marshalling will work as client expects
+    utils.Assert(*((*uint8) (unsafe.Pointer(&byteOrderChecker))) == 0xef)
+
     this = &net{serverKeys: crypto.GenerateServerKeys()}
     crypto.Initialize(this.serverKeys, paddingBlockSize, messageSize)
 }
