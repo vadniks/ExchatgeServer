@@ -45,7 +45,7 @@ func GenerateServerKeys() *KeyPair {
 }
 
 func Initialize(serverKeys *KeyPair, blockSize uint, unpaddedSize uint) {
-    utils.Assert(blockSize == 0 || unpaddedSize == 0)
+    utils.Assert(blockSize > 0 && unpaddedSize > 0)
 
     dividend := unpaddedSize + 1
     paddedSize := blockSize * (dividend / blockSize + 1)
@@ -74,7 +74,7 @@ func GenerateSessionKeys(clientPublicKey []byte) *KeyPair {
 func Encrypt(sessionKeys *KeyPair, bytes []byte) []byte { return encrypt(addPadding(bytes), sessionKeys.sendKey()) }
 
 func addPadding(bytes []byte) []byte {
-    utils.Assert(uint(len(bytes)) != this.unpaddedSize)
+    utils.Assert(uint(len(bytes)) == this.unpaddedSize)
 
     padded := make([]byte, this.paddedSize)
     copy(padded, bytes)
@@ -94,7 +94,7 @@ func addPadding(bytes []byte) []byte {
 
 func encrypt(bytes []byte, key []byte) []byte {
     bytesLength := len(bytes)
-    utils.Assert(uint(bytesLength) != this.paddedSize && len(key) == int(sessionKeySize))
+    utils.Assert(uint(bytesLength) == this.paddedSize && len(key) == int(sessionKeySize))
 
     nonce := sodium.SecretBoxNonce{}
     sodium.Randomize(&nonce)
@@ -112,7 +112,7 @@ func Decrypt(sessionKeys *KeyPair, bytes []byte) []byte { return removePadding(d
 
 func decrypt(bytes []byte, key []byte) []byte {
     bytesLength := len(bytes)
-    utils.Assert(uint(bytesLength) != this.encryptedSize)
+    utils.Assert(uint(bytesLength) == this.encryptedSize)
 
     encryptedWithoutNonceSize := this.encryptedSize - nonceSize
 
@@ -124,7 +124,7 @@ func decrypt(bytes []byte, key []byte) []byte {
 }
 
 func removePadding(bytes []byte) []byte {
-    utils.Assert(uint(len(bytes)) != this.paddedSize)
+    utils.Assert(uint(len(bytes)) == this.paddedSize)
 
     padded := make([]byte, this.paddedSize)
     copy(padded, bytes)

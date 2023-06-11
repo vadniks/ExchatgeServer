@@ -56,7 +56,7 @@ func unpackMessage(bytes []byte) *message {
 }
 
 func Initialize() {
-    this.serverKeys = crypto.GenerateServerKeys()
+    this = &net{serverKeys: crypto.GenerateServerKeys()}
     crypto.Initialize(this.serverKeys, paddingBlockSize, messageSize)
 }
 
