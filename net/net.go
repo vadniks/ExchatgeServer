@@ -4,22 +4,35 @@ package net
 import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/utils"
+    "fmt"
     goNet "net"
+    "sync"
     "unsafe"
 )
 
 const host = "localhost:8080"
+
 const paddingBlockSize = 16
+
 const messageHeadSize = 4 * 4 + 8 // 24
 const messageBodySize = 1 << 10 // 1024
 const messageSize = messageHeadSize + messageBodySize // 1048
+
 const intSize = 4
 const longSize = 8
-var this *net
+
+const flagFinish = 0xffffffff
+const flagUnauthenticated = 0x7ffffffe
+const flagAdminShutdown = 0x00000000
+
+const clientMessageFinish = 1
+const clientMessageProceed = 0
+const clientMessageShutdown = -1
 
 type net struct {
     serverKeys *crypto.KeyPair
 }
+var this *net
 
 type message struct {
     flag int32
@@ -67,27 +80,45 @@ func Initialize() {
 }
 
 func ProcessClients() {
-    server, err := goNet.Listen("tcp", host)
+    listener, err := goNet.Listen("tcp", host)
     utils.Assert(err == nil)
-    defer utils.Assert(server.Close() == nil)
 
-    for { go processClient(&server) } // TODO: add administrative shutdown hook
+    var waitGroup sync.WaitGroup
+    acceptingClients := true
+    onShutDownRequested := func() {
+        acceptingClients = false
+        utils.Assert(listener.Close() == nil)
+        waitGroup.Wait()
+    }
+
+    for acceptingClients {
+        connection, err := listener.Accept()
+        if err != nil { break }
+
+        waitGroup.Add(1)
+        go processClient(&connection, &waitGroup, &onShutDownRequested)
+    }
 }
 
-func processClient(server *goNet.Listener) {
-    connection, err := (*server).Accept()
-    utils.Assert(err == nil)
-    defer utils.Assert(connection.Close() == nil)
-
-    send(&connection, this.serverKeys.PublicKey())
+func processClient(connection *goNet.Conn, waitGroup *sync.WaitGroup, onShutDownRequested *func()) {
+    send(connection, this.serverKeys.PublicKey())
 
     clientPublicKey := make([]byte, crypto.PublicKeySize)
-    receive(&connection, clientPublicKey)
+    receive(connection, clientPublicKey)
     sessionKeys := crypto.GenerateSessionKeys(clientPublicKey)
 
     messageBuffer := make([]byte, messageSize)
     for {
-        if receive(&connection, messageBuffer) { processClientMessage(sessionKeys, messageBuffer) }
+        if receive(connection, messageBuffer) {
+            switch processClientMessage(sessionKeys, messageBuffer) {
+                case clientMessageFinish: waitGroup.Done(); return
+                case clientMessageProceed: break
+                case clientMessageShutdown:
+                    waitGroup.Done()
+                    (*onShutDownRequested)()// TODO: verify client's administrative rights to allow requesting shutdown
+                    return
+            }
+        }
     }
 }
 
@@ -102,6 +133,14 @@ func receive(connection *goNet.Conn, buffer []byte) bool {
     return count == len(buffer)
 }
 
-func processClientMessage(sessionKeys *crypto.KeyPair, message []byte) {
-    
+func processClientMessage(sessionKeys *crypto.KeyPair, message []byte) int {
+    test := unpackMessage(message) // TODO: test only
+    fmt.Println(
+        test.flag,
+        test.timestamp,
+        test.size,
+        test.index,
+        test.count,
+    )
+    return clientMessageShutdown
 }

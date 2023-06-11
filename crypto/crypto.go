@@ -16,7 +16,6 @@ const PublicKeySize uint = 32
 const macSize uint = 16
 const nonceSize uint = 24
 const sessionKeySize = PublicKeySize
-var this *crypto
 
 type crypto struct {
     blockSize uint
@@ -25,6 +24,7 @@ type crypto struct {
     encryptedSize uint
     serverKeys sodium.KXKP
 }
+var this *crypto
 
 type KeyPair struct {
     Key1 []byte // public key or receive key
