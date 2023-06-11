@@ -116,7 +116,7 @@ func processClient(connection *goNet.Conn, waitGroup *sync.WaitGroup, onShutDown
     messageBuffer := make([]byte, this.messageBufferSize)
     for {
         if receive(connection, messageBuffer) {
-            switch processClientMessage(sessionKeys, messageBuffer) {
+            switch processClientMessage(connection, sessionKeys, messageBuffer) {
                 case clientMessageFinish: waitGroup.Done(); return
                 case clientMessageProceed: break
                 case clientMessageShutdown:
@@ -139,8 +139,8 @@ func receive(connection *goNet.Conn, buffer []byte) bool {
     return count == len(buffer)
 }
 
-func processClientMessage(sessionKeys *crypto.KeyPair, message []byte) int {
-    decrypted := crypto.Decrypt(sessionKeys, message)
+func processClientMessage(connection *goNet.Conn, sessionKeys *crypto.KeyPair, messageBytes []byte) int {
+    decrypted := crypto.Decrypt(sessionKeys, messageBytes)
     test := unpackMessage(decrypted) // TODO: test only
     fmt.Println(
         test.flag,
@@ -149,5 +149,16 @@ func processClientMessage(sessionKeys *crypto.KeyPair, message []byte) int {
         test.index,
         test.count,
     )
+
+    test2 := &message{ // TODO: test only
+        int32(0x12345678),
+        0,
+        1,
+        0,
+        1,
+        [messageBodySize]byte{},
+    }
+    for i, _ := range test2.body { test2.body[i] = 1 }
+    send(connection, crypto.Encrypt(sessionKeys, test2.pack()))
     return clientMessageShutdown
 }
