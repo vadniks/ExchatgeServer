@@ -3,9 +3,12 @@ package net
 
 import (
     "ExchatgeServer/crypto"
+    "ExchatgeServer/utils"
     "unsafe"
+    goNet "net"
 )
 
+const host = "localhost:8080"
 const paddingBlockSize = 16
 const messageHeadSize = 4 * 4 + 8 // 24
 const messageBodySize = 1 << 10 // 1024
@@ -61,7 +64,13 @@ func Initialize() {
 }
 
 func ProcessClients() {
+    server, err := goNet.Listen("tcp", host)
+    utils.Assert(err == nil)
+    defer utils.Assert(server.Close() == nil)
 
+    for {
+        // TODO
+    }
 }
 
 func processClient() {
