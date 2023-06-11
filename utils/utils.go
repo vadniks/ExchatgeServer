@@ -1,5 +1,5 @@
 
-package main
+package utils
 
 import (
     "fmt"
@@ -13,4 +13,4 @@ func throw(msg string) {
     os.Exit(1)
 }
 
-func justThrow() { throw("") }
+func JustThrow() { throw("") }
