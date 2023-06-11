@@ -62,6 +62,8 @@ func Initialize(serverKeys *KeyPair, blockSize uint, unpaddedSize uint) {
     }
 }
 
+func EncryptedSize() uint { return this.encryptedSize }
+
 func GenerateSessionKeys(clientPublicKey []byte) *KeyPair {
     utils.Assert(len(clientPublicKey) == int(PublicKeySize))
     keys, err := this.serverKeys.ServerSessionKeys(sodium.KXPublicKey{Bytes: clientPublicKey})

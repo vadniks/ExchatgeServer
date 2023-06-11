@@ -32,6 +32,7 @@ const clientMessageShutdown = -1
 
 type net struct {
     serverKeys *crypto.KeyPair
+    messageBufferSize uint
 }
 var this *net
 
@@ -78,6 +79,7 @@ func Initialize() {
 
     this = &net{serverKeys: crypto.GenerateServerKeys()}
     crypto.Initialize(this.serverKeys, paddingBlockSize, messageSize)
+    this.messageBufferSize = crypto.EncryptedSize()
 }
 
 func ProcessClients() {
@@ -111,7 +113,7 @@ func processClient(connection *goNet.Conn, waitGroup *sync.WaitGroup, onShutDown
     receive(connection, clientPublicKey)
     sessionKeys := crypto.GenerateSessionKeys(clientPublicKey)
 
-    messageBuffer := make([]byte, messageSize)
+    messageBuffer := make([]byte, this.messageBufferSize)
     for {
         if receive(connection, messageBuffer) {
             switch processClientMessage(sessionKeys, messageBuffer) {
@@ -138,7 +140,8 @@ func receive(connection *goNet.Conn, buffer []byte) bool {
 }
 
 func processClientMessage(sessionKeys *crypto.KeyPair, message []byte) int {
-    test := unpackMessage(message) // TODO: test only
+    decrypted := crypto.Decrypt(sessionKeys, message)
+    test := unpackMessage(decrypted) // TODO: test only
     fmt.Println(
         test.flag,
         test.timestamp,
