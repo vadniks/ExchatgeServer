@@ -142,7 +142,17 @@ func receive(connection *goNet.Conn, buffer []byte) bool {
     return count == len(buffer)
 }
 
+var testCount = 0 // TODO: test only
 func processClientMessage(connection *goNet.Conn, sessionKeys *crypto.KeyPair, messageBytes []byte) int {
+    if testCount > 0 { // TODO: test only
+        decrypted := crypto.Decrypt(sessionKeys, messageBytes)
+        test := unpackMessage(decrypted) // TODO: test only
+        fmt.Println("#####", string(test.body[:]))
+
+        return clientMessageShutdown
+    }
+    testCount++
+
     decrypted := crypto.Decrypt(sessionKeys, messageBytes)
     test := unpackMessage(decrypted) // TODO: test only
     fmt.Println(
@@ -164,5 +174,5 @@ func processClientMessage(connection *goNet.Conn, sessionKeys *crypto.KeyPair, m
     for i, _ := range test2.body { test2.body[i] = 'a' }
     send(connection, crypto.Encrypt(sessionKeys, test2.pack()))
 
-    return clientMessageShutdown
+    return clientMessageProceed
 }
