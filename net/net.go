@@ -15,9 +15,9 @@ const host = "localhost:8080"
 
 const paddingBlockSize = 16
 
-const messageHeadSize = 4 * 4 + 8 // 24
+const messageHeadSize = 4 * 6 + 8 // 32
 const messageBodySize = 1 << 10 // 1024
-const messageSize = messageHeadSize + messageBodySize // 1048
+const messageSize = messageHeadSize + messageBodySize // 1056
 
 const intSize = 4
 const longSize = 8
@@ -42,6 +42,8 @@ type message struct {
     size uint32
     index uint32
     count uint32
+    from uint32
+    to uint32
     body [messageBodySize]byte
 }
 
@@ -54,6 +56,8 @@ func (message *message) pack() []byte {
     copy(unsafe.Slice(&(bytes[intSize + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), intSize))
     copy(unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), intSize))
     copy(unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), intSize))
+    copy(unsafe.Slice(&(bytes[intSize * 4 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.from))), intSize))
+    copy(unsafe.Slice(&(bytes[intSize * 5 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.to))), intSize))
 
     copy(unsafe.Slice(&(bytes[messageHeadSize]), messageBodySize), unsafe.Slice(&(message.body[0]), messageBodySize))
     return bytes
@@ -61,13 +65,15 @@ func (message *message) pack() []byte {
 
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
 func unpackMessage(bytes []byte) *message {
-    message := new(message)
+    message := new(message) // TODO: make generic lambda to copy bytes
 
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), intSize), unsafe.Slice(&(bytes[0]), intSize))
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.timestamp))), longSize), unsafe.Slice(&(bytes[intSize]), longSize))
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), intSize), unsafe.Slice(&(bytes[intSize + longSize]), intSize))
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), intSize), unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize))
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), intSize), unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.from))), intSize), unsafe.Slice(&(bytes[intSize * 4 + longSize]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.to))), intSize), unsafe.Slice(&(bytes[intSize * 5 + longSize]), intSize))
 
     copy(unsafe.Slice(&(message.body[0]), messageBodySize), unsafe.Slice(&(bytes[messageHeadSize]), messageBodySize))
     return message
@@ -147,7 +153,16 @@ func processClientMessage(connection *goNet.Conn, sessionKeys *crypto.KeyPair, m
     if testCount > 0 { // TODO: test only
         decrypted := crypto.Decrypt(sessionKeys, messageBytes)
         test := unpackMessage(decrypted) // TODO: test only
-        fmt.Println("#####", string(test.body[:]))
+        fmt.Println("#####",
+            test.flag,
+            test.timestamp,
+            test.size,
+            test.index,
+            test.count,
+            test.from,
+            test.to,
+            string(test.body[:]),
+        )
 
         return clientMessageShutdown
     }
@@ -156,11 +171,14 @@ func processClientMessage(connection *goNet.Conn, sessionKeys *crypto.KeyPair, m
     decrypted := crypto.Decrypt(sessionKeys, messageBytes)
     test := unpackMessage(decrypted) // TODO: test only
     fmt.Println(
+        "@@@@@",
         test.flag,
         test.timestamp,
         test.size,
         test.index,
         test.count,
+        test.from,
+        test.to,
     )
 
     test2 := &message{ // TODO: test only
@@ -169,6 +187,8 @@ func processClientMessage(connection *goNet.Conn, sessionKeys *crypto.KeyPair, m
         1,
         0,
         1,
+        255,
+        255,
         [messageBodySize]byte{},
     }
     for i, _ := range test2.body { test2.body[i] = 'a' }
