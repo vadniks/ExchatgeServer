@@ -44,7 +44,7 @@ type message struct {
     count uint32
     from uint32
     to uint32
-    body [messageBodySize]byte
+    body [messageBodySize]byte // TODO: generate permanent encryption key for each conversation and store encrypted messages in a database
 }
 
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
