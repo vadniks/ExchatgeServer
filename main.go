@@ -1,9 +1,13 @@
 
 package main
 
-import "ExchatgeServer/net"
+import (
+    "ExchatgeServer/database"
+    "ExchatgeServer/net"
+)
 
 func main() {
+    database.Init()
     net.Initialize()
     net.ProcessClients()
 }

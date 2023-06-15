@@ -6,6 +6,7 @@ services:
     ports:
       - '27017:27017'
     volumes:
-      - db:/data/db
+      - ./db:/data/db
+    container_name: exchatge_mongo
 volumes:
   db:
