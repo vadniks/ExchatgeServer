@@ -31,7 +31,8 @@ const clientMessageProceed = 0
 const clientMessageShutdown = -1
 
 type net struct {
-    serverKeys *crypto.KeyPair
+    serverPublicKey []byte
+    serverSecretKey []byte
     messageBufferSize uint
 }
 var this *net
@@ -81,11 +82,16 @@ func unpackMessage(bytes []byte) *message {
 
 func Initialize() {
     var byteOrderChecker uint64 = 0x0123456789abcdef // only on x64 littleEndian data marshalling will work as clients expect
-    utils.Assert(*((*uint8) (unsafe.Pointer(&byteOrderChecker))) == 0xef)
+    utils.Assert(unsafe.Sizeof(uintptr(0)) == 8 && *((*uint8) (unsafe.Pointer(&byteOrderChecker))) == 0xef)
 
-    this = &net{serverKeys: crypto.GenerateServerKeys()}
-    crypto.Initialize(this.serverKeys, paddingBlockSize, messageSize)
-    this.messageBufferSize = crypto.EncryptedSize()
+    crypto.Init()
+    serverPublicKey, serverSecretKey := crypto.GenerateServerKeys()
+
+    this = &net{
+        serverPublicKey,
+        serverSecretKey,
+        crypto.EncryptedSize(messageSize),
+    }
 }
 
 func ProcessClients() {
@@ -113,16 +119,16 @@ func ProcessClients() {
 }
 
 func processClient(connection *goNet.Conn, waitGroup *sync.WaitGroup, onShutDownRequested *func()) {
-    send(connection, this.serverKeys.PublicKey())
+    send(connection, this.serverPublicKey)
 
-    clientPublicKey := make([]byte, crypto.PublicKeySize)
+    clientPublicKey := make([]byte, crypto.KeySize)
     receive(connection, clientPublicKey)
-    sessionKeys := crypto.GenerateSessionKeys(clientPublicKey)
+    encryptionKey := crypto.ExchangeKeys(this.serverPublicKey, this.serverPublicKey, clientPublicKey)
 
     messageBuffer := make([]byte, this.messageBufferSize)
     for {
         if receive(connection, messageBuffer) {
-            switch processClientMessage(connection, sessionKeys, messageBuffer) {
+            switch processClientMessage(connection, encryptionKey, messageBuffer) {
                 case clientMessageFinish:
                     waitGroup.Done()
                     return
@@ -149,9 +155,12 @@ func receive(connection *goNet.Conn, buffer []byte) bool {
 }
 
 var testCount = 0 // TODO: test only
-func processClientMessage(connection *goNet.Conn, sessionKeys *crypto.KeyPair, messageBytes []byte) int {
+func processClientMessage(connection *goNet.Conn, encryptionKey []byte, messageBytes []byte) int {
     if testCount > 0 { // TODO: test only
-        decrypted := crypto.Decrypt(sessionKeys, messageBytes)
+        fmt.Println()
+        for _, i := range messageBytes { fmt.Printf("%d ", i) }
+        fmt.Println()
+        decrypted := crypto.Decrypt(messageBytes, encryptionKey)
         test := unpackMessage(decrypted) // TODO: test only
         fmt.Println("#####",
             test.flag,
@@ -168,7 +177,7 @@ func processClientMessage(connection *goNet.Conn, sessionKeys *crypto.KeyPair, m
     }
     testCount++
 
-    decrypted := crypto.Decrypt(sessionKeys, messageBytes)
+    decrypted := crypto.Decrypt(messageBytes, encryptionKey)
     test := unpackMessage(decrypted) // TODO: test only
     fmt.Println(
         "@@@@@",
@@ -192,7 +201,7 @@ func processClientMessage(connection *goNet.Conn, sessionKeys *crypto.KeyPair, m
         [messageBodySize]byte{},
     }
     for i, _ := range test2.body { test2.body[i] = 'a' }
-    send(connection, crypto.Encrypt(sessionKeys, test2.pack()))
+    send(connection, crypto.Encrypt(test2.pack(), encryptionKey))
 
     return clientMessageProceed
 }
