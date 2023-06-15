@@ -4,7 +4,6 @@ package crypto
 import "C"
 import (
     "ExchatgeServer/utils"
-    "fmt"
     "github.com/jamesruan/sodium"
     "unsafe"
 )
@@ -33,10 +32,6 @@ func ExchangeKeys(serverPublicKey []byte, serverSecretKey []byte, clientPublicKe
     }
     sessionKeys, err := keys.ServerSessionKeys(sodium.KXPublicKey{Bytes: clientPublicKey})
 
-    fmt.Println("ek") // TODO: test only
-    for _, i := range sessionKeys.Rx.Bytes { fmt.Printf("%d ", i) }
-    fmt.Println()
-
     if err == nil {
         return sessionKeys.Rx.Bytes
     } else {
@@ -55,7 +50,7 @@ func Encrypt(bytes []byte, key []byte) []byte {
     encrypted := make([]byte, EncryptedSize(bytesSize))
 
     copy(encrypted, ciphered)
-    copy(unsafe.Slice(&(encrypted[bytesSize+macSize]), nonceSize), nonce.Bytes)
+    copy(unsafe.Slice(&(encrypted[bytesSize + macSize]), nonceSize), nonce.Bytes)
 
     return encrypted
 }

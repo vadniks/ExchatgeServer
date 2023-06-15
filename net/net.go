@@ -120,16 +120,8 @@ func ProcessClients() {
 func processClient(connection *goNet.Conn, waitGroup *sync.WaitGroup, onShutDownRequested *func()) {
     send(connection, this.serverPublicKey)
 
-    fmt.Println("spk") // TODO: test only
-    for _, i := range this.serverPublicKey { fmt.Printf("%d ", i) }
-    fmt.Println()
-
     clientPublicKey := make([]byte, crypto.KeySize)
     receive(connection, clientPublicKey)
-
-    fmt.Println("cpk") // TODO: test only
-    for _, i := range clientPublicKey { fmt.Printf("%d ", i) }
-    fmt.Println()
 
     encryptionKey := crypto.ExchangeKeys(this.serverPublicKey, this.serverSecretKey, clientPublicKey)
     utils.Assert(encryptionKey != nil)
@@ -159,7 +151,6 @@ func send(connection *goNet.Conn, payload []byte) {
 
 func receive(connection *goNet.Conn, buffer []byte) bool {
     count, err := (*connection).Read(buffer)
-    if err != nil { fmt.Println(err) }
     utils.Assert(err == nil)
     return count == len(buffer)
 }
