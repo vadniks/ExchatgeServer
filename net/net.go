@@ -149,6 +149,7 @@ func send(connection *goNet.Conn, payload []byte) {
 
 func receive(connection *goNet.Conn, buffer []byte) bool {
     count, err := (*connection).Read(buffer)
+    if err != nil { fmt.Println(err) } // TODO: EOF - this shit isn't working - debug is needed
     utils.Assert(err == nil)
     return count == len(buffer)
 }
