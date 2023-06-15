@@ -84,7 +84,6 @@ func Initialize() {
     var byteOrderChecker uint64 = 0x0123456789abcdef // only on x64 littleEndian data marshalling will work as clients expect
     utils.Assert(unsafe.Sizeof(uintptr(0)) == 8 && *((*uint8) (unsafe.Pointer(&byteOrderChecker))) == 0xef)
 
-    crypto.Init()
     serverPublicKey, serverSecretKey := crypto.GenerateServerKeys()
 
     this = &net{

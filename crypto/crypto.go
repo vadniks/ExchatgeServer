@@ -12,14 +12,6 @@ const KeySize uint = 32
 const macSize uint = 16
 const nonceSize uint = 24
 
-func Init() {
-    utils.Assert(
-        uint(len(sodium.KXKP{}.PublicKey.Bytes)) == KeySize &&
-        uint(len(sodium.KXSessionKeys{}.Rx.Bytes)) == KeySize &&
-        uint(len(sodium.SecretBoxKey{}.Bytes)) == KeySize, // trailing comma passed in one parameter function - weired syntax, but this doesn't compile without it
-    )
-}
-
 func GenerateServerKeys() ([]byte, []byte) {
     serverKeys := sodium.MakeKXKP()
     return serverKeys.PublicKey.Bytes, serverKeys.SecretKey.Bytes
