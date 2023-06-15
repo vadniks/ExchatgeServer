@@ -120,9 +120,19 @@ func ProcessClients() {
 func processClient(connection *goNet.Conn, waitGroup *sync.WaitGroup, onShutDownRequested *func()) {
     send(connection, this.serverPublicKey)
 
+    fmt.Println("spk") // TODO: test only
+    for _, i := range this.serverPublicKey { fmt.Printf("%d ", i) }
+    fmt.Println()
+
     clientPublicKey := make([]byte, crypto.KeySize)
     receive(connection, clientPublicKey)
-    encryptionKey := crypto.ExchangeKeys(this.serverPublicKey, this.serverPublicKey, clientPublicKey)
+
+    fmt.Println("cpk") // TODO: test only
+    for _, i := range clientPublicKey { fmt.Printf("%d ", i) }
+    fmt.Println()
+
+    encryptionKey := crypto.ExchangeKeys(this.serverPublicKey, this.serverSecretKey, clientPublicKey)
+    utils.Assert(encryptionKey != nil)
 
     messageBuffer := make([]byte, this.messageBufferSize)
     for {
@@ -149,7 +159,7 @@ func send(connection *goNet.Conn, payload []byte) {
 
 func receive(connection *goNet.Conn, buffer []byte) bool {
     count, err := (*connection).Read(buffer)
-    if err != nil { fmt.Println(err) } // TODO: EOF - this shit isn't working - debug is needed
+    if err != nil { fmt.Println(err) }
     utils.Assert(err == nil)
     return count == len(buffer)
 }
@@ -178,6 +188,7 @@ func processClientMessage(connection *goNet.Conn, encryptionKey []byte, messageB
     testCount++
 
     decrypted := crypto.Decrypt(messageBytes, encryptionKey)
+    fmt.Println(len(decrypted)) // TODO: size is zero, debug
     test := unpackMessage(decrypted) // TODO: test only
     fmt.Println(
         "@@@@@",

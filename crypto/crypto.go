@@ -32,7 +32,7 @@ func ExchangeKeys(serverPublicKey []byte, serverSecretKey []byte, clientPublicKe
     }
     sessionKeys, err := keys.ServerSessionKeys(sodium.KXPublicKey{Bytes: clientPublicKey})
 
-    if err != nil {
+    if err == nil {
         return sessionKeys.Tx.Bytes
     } else {
         return nil
