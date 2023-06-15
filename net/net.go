@@ -158,9 +158,6 @@ func receive(connection *goNet.Conn, buffer []byte) bool {
 var testCount = 0 // TODO: test only
 func processClientMessage(connection *goNet.Conn, encryptionKey []byte, messageBytes []byte) int {
     if testCount > 0 { // TODO: test only
-        fmt.Println()
-        for _, i := range messageBytes { fmt.Printf("%d ", i) }
-        fmt.Println()
         decrypted := crypto.Decrypt(messageBytes, encryptionKey)
         test := unpackMessage(decrypted) // TODO: test only
         fmt.Println("#####",
@@ -179,7 +176,6 @@ func processClientMessage(connection *goNet.Conn, encryptionKey []byte, messageB
     testCount++
 
     decrypted := crypto.Decrypt(messageBytes, encryptionKey)
-    fmt.Println(len(decrypted)) // TODO: size is zero, debug
     test := unpackMessage(decrypted) // TODO: test only
     fmt.Println(
         "@@@@@",
