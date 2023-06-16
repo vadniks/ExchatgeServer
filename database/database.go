@@ -20,16 +20,17 @@ const collectionMessages = "messages"
 var adminUsername = []byte{'a', 'd', 'm', 'i', 'n'}
 var adminPassword = crypto.Hash([]byte{'a', 'd', 'm', 'i', 'n'})
 
-type User struct {
-    id uint32
-    name []byte
-    password []byte
-}
-const fieldId = "id"
-const fieldName = "name"
-const fieldPassword = "password"
+const fieldId = "Id"
+const fieldName = "Name"
+const fieldPassword = "Password"
 
-// TODO: store each conversation's encryption key on client's side for each client, store name of each participant of each conversation on the client side
+type User struct {
+    Id uint32 `bson:"id"`
+    Name []byte `bson:"name"`
+    Password []byte `bson:"password"`
+}
+
+// TODO: store each conversation's encryption key on client's side for each client, store Name of each participant of each conversation on the client side
 
 type database struct {
     ctx *context.Context
@@ -52,7 +53,7 @@ func Init() {
 }
 
 func addAdminIfNotExists() {
-    usr := User{id: 0, name: adminUsername, password: adminPassword}
+    usr := User{Id: 0, Name: adminUsername, Password: adminPassword}
     if result := this.collection.FindOne(*(this.ctx), usr); result.Err() == mongo.ErrNoDocuments {
         _, err := this.collection.InsertOne(*(this.ctx), usr)
         utils.Assert(err == nil)
@@ -63,7 +64,7 @@ func IsAdmin(usr *User) bool {
     if result := this.collection.FindOne(*(this.ctx), bson.D{{fieldId, 0}}); result.Err() == nil {
         var temp User
         utils.Assert(result.Decode(&temp) == nil)
-        return reflect.DeepEqual(temp.name, usr.name) && reflect.DeepEqual(temp.password, usr.password)
+        return reflect.DeepEqual(temp.Name, usr.Name) && reflect.DeepEqual(temp.Password, usr.Password)
     } else {
         return false
     }
@@ -71,8 +72,8 @@ func IsAdmin(usr *User) bool {
 
 func CheckUser(usr *User) bool {
     return this.collection.FindOne(*(this.ctx), bson.D{
-        {fieldName, usr.name},
-        {fieldPassword, usr.password},
+        {fieldName, usr.Name},
+        {fieldPassword, usr.Password},
     }).Err() == nil
 }
 
