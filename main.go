@@ -2,12 +2,14 @@
 package main
 
 import (
-    "ExchatgeServer/database"
-    "ExchatgeServer/net"
+    "ExchatgeServer/crypto"
+    "fmt"
 )
 
 func main() {
-    database.Init()
-    net.Initialize()
-    net.ProcessClients()
+    fmt.Println(crypto.Hash([]byte("test"))) // TODO: add salt
+
+    //database.Init()
+    //net.Initialize()
+    //net.ProcessClients()
 }
