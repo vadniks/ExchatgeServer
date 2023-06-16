@@ -4,7 +4,6 @@ package net
 import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/utils"
-    "fmt"
     goNet "net"
     "sync"
     "sync/atomic"
@@ -22,20 +21,12 @@ const messageSize = messageHeadSize + messageBodySize // 1056
 const intSize = 4
 const longSize = 8
 
-const flagFinish = 0xffffffff
-const flagUnauthenticated = 0x7ffffffe
-const flagAdminShutdown = 0x00000000
-
-const clientMessageFinish = 1
-const clientMessageProceed = 0
-const clientMessageShutdown = -1
-
 type net struct {
     serverPublicKey []byte
     serverSecretKey []byte
     messageBufferSize uint
 }
-var this *net
+var this *net = nil
 
 type message struct {
     flag int32
@@ -47,6 +38,8 @@ type message struct {
     to uint32
     body [messageBodySize]byte // TODO: generate permanent encryption key for each conversation and store encrypted messages in a database
 }
+
+var connections map[uint]*goNet.Conn
 
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
 func (message *message) pack() []byte {
@@ -108,16 +101,21 @@ func ProcessClients() {
         waitGroup.Wait()
     }
 
+    var connectionId uint = 0
     for acceptingClients.Load() {
         connection, err := listener.Accept()
         if err != nil { break }
 
         waitGroup.Add(1)
-        go processClient(&connection, &waitGroup, &onShutDownRequested)
+        connections[connectionId] = &connection
+        go processClient(connectionId, &waitGroup, &onShutDownRequested)
+        connectionId++
     }
 }
 
-func processClient(connection *goNet.Conn, waitGroup *sync.WaitGroup, onShutDownRequested *func()) {
+func processClient(connectionId uint, waitGroup *sync.WaitGroup, onShutDownRequested *func()) {
+    connection := connections[connectionId]
+
     send(connection, this.serverPublicKey)
 
     clientPublicKey := make([]byte, crypto.KeySize)
@@ -129,13 +127,13 @@ func processClient(connection *goNet.Conn, waitGroup *sync.WaitGroup, onShutDown
     messageBuffer := make([]byte, this.messageBufferSize)
     for {
         if receive(connection, messageBuffer) {
-            switch processClientMessage(connection, encryptionKey, messageBuffer) {
-                case clientMessageFinish:
+            switch processClientMessage(connectionId, encryptionKey, messageBuffer) {
+                case flagFinish:
                     waitGroup.Done()
                     return
-                case clientMessageProceed:
+                case flagProceed:
                     break
-                case clientMessageShutdown:
+                case flagAdminShutdown:
                     waitGroup.Done()
                     (*onShutDownRequested)()// TODO: verify client's administrative rights to allow requesting shutdown
                     return
@@ -155,51 +153,14 @@ func receive(connection *goNet.Conn, buffer []byte) bool {
     return count == len(buffer)
 }
 
-var testCount = 0 // TODO: test only
-func processClientMessage(connection *goNet.Conn, encryptionKey []byte, messageBytes []byte) int {
-    if testCount > 0 { // TODO: test only
-        decrypted := crypto.Decrypt(messageBytes, encryptionKey)
-        test := unpackMessage(decrypted) // TODO: test only
-        fmt.Println("#####",
-            test.flag,
-            test.timestamp,
-            test.size,
-            test.index,
-            test.count,
-            test.from,
-            test.to,
-            string(test.body[:]),
-        )
-
-        return clientMessageShutdown
-    }
-    testCount++
-
+func processClientMessage(connectionId uint, encryptionKey []byte, messageBytes []byte) int32 {
     decrypted := crypto.Decrypt(messageBytes, encryptionKey)
-    test := unpackMessage(decrypted) // TODO: test only
-    fmt.Println(
-        "@@@@@",
-        test.flag,
-        test.timestamp,
-        test.size,
-        test.index,
-        test.count,
-        test.from,
-        test.to,
-    )
+    message := unpackMessage(decrypted)
+    return syncMessage(connectionId, message)
+}
 
-    test2 := &message{ // TODO: test only
-        int32(0x12345678),
-        0,
-        1,
-        0,
-        1,
-        255,
-        255,
-        [messageBodySize]byte{},
-    }
-    for i, _ := range test2.body { test2.body[i] = 'a' }
-    send(connection, crypto.Encrypt(test2.pack(), encryptionKey))
-
-    return clientMessageProceed
+func sendMessage(connectionId uint, msg *message) {
+    connection := connections[connectionId]
+    utils.Assert(connection != nil)
+    send(connection, msg.pack())
 }

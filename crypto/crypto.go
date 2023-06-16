@@ -11,6 +11,7 @@ import (
 const KeySize uint = 32
 const macSize uint = 16
 const nonceSize uint = 24
+const hashSize uint = 32
 
 func GenerateServerKeys() ([]byte, []byte) {
     serverKeys := sodium.MakeKXKP()
@@ -66,4 +67,11 @@ func Decrypt(bytes []byte, key []byte) []byte {
 
     decrypted, err := sodium.Bytes(bytes[:encryptedWithoutNonceSize]).SecretBoxOpen(nonce, boxKey)
     if err == nil { return decrypted } else { return nil }
+}
+
+func Hash(bytes []byte) []byte {
+    hash := sodium.NewGenericHash(int(hashSize))
+    count, err := hash.Write(bytes)
+    utils.Assert(count == len(bytes) && err == nil)
+    return hash.Sum([]byte{})
 }
