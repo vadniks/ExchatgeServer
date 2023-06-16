@@ -69,7 +69,7 @@ func Decrypt(bytes []byte, key []byte) []byte {
     if err == nil { return decrypted } else { return nil }
 }
 
-func Hash(bytes []byte) []byte {
+func Hash(bytes []byte) []byte { // TODO: test
     hash := sodium.NewGenericHash(int(hashSize))
     count, err := hash.Write(bytes)
     utils.Assert(count == len(bytes) && err == nil)

@@ -21,36 +21,76 @@ const flagAdminShutdown int32 = 0x7fffffff
 
 const fromServer uint32 = 0x7fffffff
 
+const stateSecureConnectionEstablished = 0
+const stateUsernameSent = 1
+const statePasswordSent = 2
+const stateRegisterRequested = 2 // TODO: deal with registration in the context of connection-related finite state machine
+const stateAuthenticated = 3
+const stateFinished = 4
+
 var connectedUsers map[uint]*database.User // key is connectionId
+var connectionStates map[uint]uint // map[connectionId]state
+
+func shutdownRequested(connectionId uint, usr *database.User) int32 {
+    if database.IsAdmin(usr) {
+        return flagAdminShutdown
+    } else {
+        sendMessage(connectionId, &message{
+            flag: flagUnauthenticated,
+            timestamp: utils.CurrentTimeMillis(),
+            size: 0,
+            index: 0,
+            count: 1,
+            from: fromServer,
+            to: usr.Id,
+            body: [1024]byte{},
+        })
+        return flagProceed
+    }
+}
+
+func sendMessageToReceiver(msg *message) int32 {
+    if toUserConnectionId, toUser := findConnectUsr(msg.to); toUser != nil {
+        sendMessage(toUserConnectionId, msg)
+    } else {
+        // TODO: user offline or doesn't exist
+    }
+    return flagProceed
+}
+
+func usernameObtained(connectionId uint, msg *message) int32 {
+    // TODO
+    connectionStates[connectionId] = stateUsernameSent
+    return flagProceed
+}
+
+func passwordObtained(connectionId uint, msg *message) int32 {
+    // TODO
+    if true {
+        // TODO: password correct
+        connectionStates[connectionId] = stateAuthenticated
+        return flagProceed
+    } else {
+        // TODO: password incorrect
+        connectionStates[connectionId] = stateFinished
+        return flagFinish
+    }
+}
 
 func syncMessage(connectionId uint, msg *message) int32 {
     flag := msg.flag
     usr := connectedUsers[connectionId]
+    connectionStates[connectionId] = stateSecureConnectionEstablished
 
     switch flag {
         case flagAdminShutdown:
-            if database.IsAdmin(usr) {
-                return flagAdminShutdown
-            } else {
-                sendMessage(connectionId, &message{
-                    flag: flagUnauthenticated,
-                    timestamp: utils.CurrentTimeMillis(),
-                    size: 0,
-                    index: 0,
-                    count: 1,
-                    from: fromServer,
-                    to: usr.Id,
-                    body: [1024]byte{},
-                })
-                return flagProceed
-            }
+            return shutdownRequested(connectionId, usr)
         case flagProceed:
-            if toUserConnectionId, toUser := findConnectUsr(msg.to); toUser != nil {
-                sendMessage(toUserConnectionId, msg)
-            } else {
-                // TODO: user offline or doesn't exist
-            }
-            break
+            return sendMessageToReceiver(msg)
+        case flagUsername:
+            return usernameObtained(connectionId, msg)
+        case flagPassword:
+            return passwordObtained(connectionId, msg)
         default:
             utils.JustThrow()
     }
