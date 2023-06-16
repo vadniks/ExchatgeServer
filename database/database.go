@@ -68,3 +68,15 @@ func IsAdmin(usr *User) bool {
         return false
     }
 }
+
+func CheckUser(usr *User) bool {
+    return this.collection.FindOne(*(this.ctx), bson.D{
+        {fieldName, usr.name},
+        {fieldPassword, usr.password},
+    }).Err() == nil
+}
+
+func AddUser(usr *User) bool {
+    result, err := this.collection.InsertOne(*(this.ctx), *usr)
+    return result != nil && err == nil
+}
