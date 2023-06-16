@@ -15,7 +15,5 @@ func throw(msg string) {
 }
 
 func JustThrow() { throw("") }
-
 func Assert(condition bool) { if !condition { JustThrow() } }
-
 func CurrentTimeMillis() uint64 { return uint64(time.Now().UnixMilli()) }
