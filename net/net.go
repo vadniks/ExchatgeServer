@@ -135,7 +135,7 @@ func processClient(connectionId uint, waitGroup *sync.WaitGroup, onShutDownReque
                     break
                 case flagAdminShutdown:
                     waitGroup.Done()
-                    (*onShutDownRequested)()// TODO: verify client's administrative rights to allow requesting shutdown
+                    (*onShutDownRequested)()
                     return
             }
         }
