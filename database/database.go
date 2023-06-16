@@ -5,6 +5,7 @@ import (
     "ExchatgeServer/utils"
     "context"
     "fmt"
+    "go.mongodb.org/mongo-driver/bson"
     "go.mongodb.org/mongo-driver/mongo"
     "go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -15,9 +16,7 @@ const collectionUsers = "users"
 const collectionConversations = "conversations"
 const collectionMessages = "messages"
 
-type User struct { // TODO: store each conversation's encryption key on client's side for each client, store name of each participant of each conversation on the client side
-    id uint32
-}
+// TODO: store each conversation's encryption key on client's side for each client, store name of each participant of each conversation on the client side
 
 func Init() {
     ctx := context.TODO()
@@ -29,19 +28,15 @@ func Init() {
 
     collection := client.Database(databaseName).Collection(collectionUsers)
 
-    fmt.Println("a")
-    count, err := collection.CountDocuments(ctx, User{}) // TODO: test only
-    utils.Assert(err == nil)
-    fmt.Println(count)
-
-    result := collection.FindOne(ctx, User{10})
+    // TODO: test only
+    result := collection.FindOne(ctx, bson.D{{"id", 1}})
     fmt.Println(result.Err())
-    var user User
+    var user bson.D
     err = result.Decode(&user)
     fmt.Println(err)
-    fmt.Println(user.id)
+    fmt.Println(user)
 
-    //result, err := collection.InsertOne(ctx, User{5})
-    //utils.Assert(err == nil)
-    //fmt.Println(result.InsertedID)
+    result2, err := collection.InsertOne(ctx, bson.D{{"id", 1}})
+    utils.Assert(err == nil)
+    fmt.Println(result2.InsertedID)
 }
