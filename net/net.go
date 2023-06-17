@@ -131,7 +131,7 @@ func processClient(connectionId uint, waitGroup *sync.WaitGroup, onShutDownReque
                     return
                 case flagProceed:
                     break
-                case flagAdminShutdown:
+                case flagShutdown:
                     waitGroup.Done()
                     (*onShutDownRequested)()
                     return

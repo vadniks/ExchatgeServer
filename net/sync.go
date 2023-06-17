@@ -9,14 +9,11 @@ import (
 const flagProceed int32 = 0x00000000
 const flagFinish int32 = 0x00000001
 const flagFetchAll int32 = 0x00000002
-const flagUsernameAndPassword int32 = 0x00000003
-const flagAuthenticated int32 = 0x00000005
-const flagUnauthenticated int32 = 0x00000006
-const flagRegister int32 = 0x00000007
-const flagRegisterSucceeded int32 = 0x00000008
-const flagRegisterFailed int32 = 0x00000009
-const flagId int32 = 0x0000000a
-const flagAdminShutdown int32 = 0x7fffffff
+const flagLoginWithCredentials int32 = 0x00000003
+const flagRegisterWithCredentials int32 = 0x00000004
+const flagError int32 = 0x00000005
+const flagId int32 = 0x00000006
+const flagShutdown int32 = 0x7fffffff
 
 const fromServer uint32 = 0x7fffffff // TODO: sign messages from server & check signature on client side
 
@@ -31,10 +28,10 @@ var connectionStates map[uint]uint // map[connectionId]state
 
 func shutdownRequested(connectionId uint, usr *database.User) int32 {
     if database.IsAdmin(usr) {
-        return flagAdminShutdown
+        return flagShutdown
     } else {
         sendMessage(connectionId, &message{
-            flag: flagUnauthenticated,
+            flag: flagError,
             timestamp: utils.CurrentTimeMillis(),
             size: 0,
             index: 0,
@@ -77,11 +74,11 @@ func syncMessage(connectionId uint, msg *message) int32 {
     connectionStates[connectionId] = stateSecureConnectionEstablished
 
     switch flag {
-        case flagAdminShutdown:
+        case flagShutdown:
             return shutdownRequested(connectionId, usr)
         case flagProceed:
             return sendMessageToReceiver(msg)
-        case flagUsernameAndPassword:
+        case flagLoginWithCredentials:
             return usernameAndPasswordObtained(connectionId, msg)
         default:
             utils.JustThrow()
