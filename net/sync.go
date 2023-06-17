@@ -58,7 +58,7 @@ func sendMessageToReceiver(msg *message) int32 {
 }
 
 func parseCredentials(msg *message) (username []byte, passwordHash []byte) {
-    utils.Assert(msg != nil)
+    utils.Assert(msg != nil && (msg.flag == flagLoginWithCredentials || msg.flag == flagRegisterWithCredentials))
     return []byte{}, []byte{} // TODO
 }
 
