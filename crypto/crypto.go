@@ -70,9 +70,16 @@ func Decrypt(bytes []byte, key []byte) []byte {
 }
 
 func Hash(bytes []byte) []byte {
+    utils.Assert(len(bytes) > 0)
     return sodium.PWHashStore(string(bytes)).Value()
 }
 
 func CompareWithHash(hash []byte, unhashed []byte) bool {
+    utils.Assert(len(hash) > 0 && len(unhashed) > 0)
     return sodium.LoadPWHashStr(hash).PWHashVerify(string(unhashed)) == nil
 }
+
+//func EncryptMessageFromServer(bytes []byte) {
+//    utils.Assert(len(bytes) > 0)
+//    sodium.
+//}

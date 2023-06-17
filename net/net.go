@@ -12,8 +12,6 @@ import (
 
 const host = "localhost:8080"
 
-const paddingBlockSize = 16
-
 const messageHeadSize = 4 * 6 + 8 // 32
 const messageBodySize = 1 << 10 // 1024
 const messageSize = messageHeadSize + messageBodySize // 1056
