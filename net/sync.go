@@ -72,28 +72,25 @@ func proceedRequested(msg *message) int32 {
     return flagProceed
 }
 
-func parseCredentials(msg *message) (username []byte, passwordHash []byte) {
+func parseCredentials(msg *message) (username []byte, unhashedPassword []byte) {
     utils.Assert(msg != nil && (msg.flag == flagLoginWithCredentials || msg.flag == flagRegisterWithCredentials))
 
     username = make([]byte, usernameSize)
     copy(username, unsafe.Slice(&(msg.body[0]), usernameSize))
 
-    passwordHash = make([]byte, crypto.HashSize)
-    copy(passwordHash, unsafe.Slice(&(msg.body[usernameSize]), crypto.HashSize))
+    unhashedPassword = make([]byte, crypto.HashSize)
+    copy(unhashedPassword, unsafe.Slice(&(msg.body[usernameSize]), crypto.HashSize))
 
-    return username, passwordHash
+    return username, unhashedPassword
 }
 
 func loginWithCredentialsRequested(connectionId uint, msg *message) int32 {
     utils.Assert(msg != nil)
 
-    username, passwordHash := parseCredentials(msg)
-    userId := database.CheckUser(&database.User{
-        Name: username,
-        Password: passwordHash,
-    })
+    username, unhashedPassword := parseCredentials(msg)
+    user := database.FindUser(username, unhashedPassword)
 
-    if userId != nil {
+    if user != nil {
         connectionStates[connectionId] = stateLoggedWithCredentials
         sendMessage(connectionId, &message{
             flag: flagLoggedIn,
@@ -102,7 +99,7 @@ func loginWithCredentialsRequested(connectionId uint, msg *message) int32 {
             index: 0,
             count: 0,
             from: fromServer,
-            to: *userId, // here's how a client obtains his id
+            to: user.Id, // here's how a client obtains his id
             body: fromServerMessageBodyStub,
         })
         return flagProceed

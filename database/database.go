@@ -18,8 +18,8 @@ const collectionUsers = "users"
 const collectionConversations = "conversations"
 const collectionMessages = "messages"
 
-var adminUsername = []byte{'a', 'd', 'm', 'i', 'n'}
-var adminPassword = crypto.Hash([]byte{'a', 'd', 'm', 'i', 'n'})
+var adminUsername = []byte("admin")
+var adminPassword = crypto.Hash([]byte("admin"))
 
 const fieldId = "id"
 const fieldName = "name"
@@ -29,6 +29,11 @@ type User struct {
     Id uint32 `bson:"id"`
     Name []byte `bson:"name"`
     Password []byte `bson:"password"`
+}
+
+func (user *User) passwordHashed() *User {
+    user.Password = crypto.Hash(user.Password)
+    return user
 }
 
 // TODO: store each conversation's encryption key on client's side for each client, store Name of each participant of each conversation on the client side
@@ -57,7 +62,7 @@ func Init(waitGroup *sync.WaitGroup) { // TODO: authenticate database connection
     mocData() // TODO: test only
 }
 
-func addAdminIfNotExists() {
+func addAdminIfNotExists() { // admin is the only user that has id equal to 0 TODO: how about adding an isAdmin field?
     if result := this.collection.FindOne(
         *(this.ctx),
         bson.D{{fieldId, 0}, {fieldName, adminUsername}},
@@ -68,37 +73,45 @@ func addAdminIfNotExists() {
 }
 
 func mocData() { // TODO: test only
-    user1 := &User{1, []byte{'u', 's', 'e', 'r', '1'}, crypto.Hash([]byte{'u', 's', 'e', 'r', '1'})}
-    user2 := &User{2, []byte{'u', 's', 'e', 'r', '2'}, crypto.Hash([]byte{'u', 's', 'e', 'r', '2'})}
+    user1 := &User{1, []byte("user1"), []byte("user1")}
+    user2 := &User{2, []byte("user2"), []byte("user2")}
 
-    if CheckUser(user1) == nil { AddUser(user1) }
-    if CheckUser(user2) == nil { AddUser(user2) }
+    if FindUser(user1.Name, user1.Password) == nil { AddUser(user1.passwordHashed()) }
+    if FindUser(user2.Name, user2.Password) == nil { AddUser(user2.passwordHashed()) }
 }
 
-func IsAdmin(usr *User) bool {
-    utils.Assert(usr != nil)
+func IsAdmin(user *User) bool {
+    utils.Assert(user != nil)
 
     if result := this.collection.FindOne(*(this.ctx), bson.D{{fieldId, 0}}); result.Err() == nil {
         var temp User
         utils.Assert(result.Decode(&temp) == nil)
-        return reflect.DeepEqual(temp.Name, usr.Name) && reflect.DeepEqual(temp.Password, usr.Password)
+
+        result := reflect.DeepEqual(temp.Name, user.Name) && reflect.DeepEqual(temp.Password, user.Password)
+        if result { utils.Assert(user.Id == 0) } // TODO: rethink logic as this
+        return result
     } else {
+        utils.Assert(user.Id != 0)
         return false
     }
 }
 
-func CheckUser(usr *User) *uint32 { // returns nillable id
-    utils.Assert(usr != nil)
+func FindUser(username []byte, unhashedPassword []byte) *User { // nillable result
+    utils.Assert(len(username) > 0 && len(unhashedPassword) > 0)
 
-    if result := this.collection.FindOne(*(this.ctx), bson.D{{fieldName, usr.Name}}); result.Err() == nil {
-        if temp := new(User); result.Decode(temp) == nil { return &(temp.Id) } else { return nil }
+    result := this.collection.FindOne(*(this.ctx), bson.D{{fieldName, username}})
+    if result.Err() != nil { return nil }
+
+    if user := new(User); result.Decode(user) == nil {
+        crypto.CompareWithHash(user.Password, unhashedPassword)
+        return user
     } else {
         return nil
     }
 }
 
-func AddUser(usr *User) bool {
-    utils.Assert(usr != nil)
-    result, err := this.collection.InsertOne(*(this.ctx), *usr)
+func AddUser(user *User) bool {
+    utils.Assert(user != nil)
+    result, err := this.collection.InsertOne(*(this.ctx), *user)
     return result != nil && err == nil
 }
