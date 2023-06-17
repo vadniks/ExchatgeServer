@@ -118,20 +118,26 @@ func loginWithCredentialsRequested(connectionId uint, msg *message) int32 { // e
     return flagProceed
 }
 
+func finishRequested(connectionId uint) int32 {
+    delete(connectedUsers, connectionId)
+    return flagFinish
+}
+
 func syncMessage(connectionId uint, msg *message) int32 {
     utils.Assert(msg != nil)
-
-    flag := msg.flag
-    usr := connectedUsers[connectionId] // nillable if user's just connected and not logged in yet
     connectionStates[connectionId] = stateSecureConnectionEstablished
 
-    switch flag {
+    switch msg.flag {
         case flagShutdown:
-            return shutdownRequested(connectionId, usr)
+            return shutdownRequested(connectionId, connectedUsers[connectionId])
         case flagProceed:
             return proceedRequested(msg)
         case flagLoginWithCredentials:
             return loginWithCredentialsRequested(connectionId, msg)
+        case flagRegisterWithCredentials:
+            return flagError // TODO
+        case flagFinish:
+            return finishRequested(connectionId)
         default:
             utils.JustThrow()
     }
