@@ -5,6 +5,7 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/database"
     "ExchatgeServer/utils"
+    "reflect"
     "unsafe"
 )
 
@@ -24,14 +25,16 @@ const flagShutdown int32 = 0x7fffffff
 
 const toAnonymous uint32 = 0x7fffffff
 
-const stateSecureConnectionEstablished = 0
-const stateLoggedWithCredentials = 1
+const stateSecureConnectionEstablished = 1
+const stateLoggedWithCredentials = 2
 
 const usernameSize uint = 16
 const unhashedPasswordSize uint = 16
 
 var connectedUsers map[uint]*database.User // key is connectionId
 var connectionStates map[uint]uint // map[connectionId]state
+
+var fromAnonymous = make([]byte, crypto.TokenSize) // all zeroes
 
 var fromServer = func() [crypto.TokenSize]byte {
    var bytes [crypto.TokenSize]byte
@@ -136,11 +139,25 @@ func finishRequested(connectionId uint) int32 {
     return flagFinish
 }
 
-func syncMessage(connectionId uint, msg *message) int32 { // TODO: rename to routeMessage or smth
+func routeMessage(connectionId uint, msg *message) int32 {
     utils.Assert(msg != nil)
-    connectionStates[connectionId] = stateSecureConnectionEstablished // TODO: test all
+    flag := msg.flag
 
-    switch msg.flag {
+    if flag == flagLoginWithCredentials || flag == flagRegisterWithCredentials {
+        utils.Assert(
+            connectionStates[connectionId] == 0 && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
+            reflect.DeepEqual(msg.from, fromAnonymous),
+        )
+        connectionStates[connectionId] = stateSecureConnectionEstablished
+    } else {
+        utils.Assert(
+            connectionStates[connectionId] > 0 &&
+            !reflect.DeepEqual(msg.from, fromAnonymous) &&
+            !reflect.DeepEqual(msg.from, fromServer),
+        )
+    }
+
+    switch flag {
         case flagShutdown:
             return shutdownRequested(connectionId, connectedUsers[connectionId])
         case flagProceed:

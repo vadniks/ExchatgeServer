@@ -164,7 +164,7 @@ func processClientMessage(connectionId uint, encryptionKey []byte, messageBytes 
     decrypted := crypto.Decrypt(messageBytes, encryptionKey)
     message := unpackMessage(decrypted)
 
-    return syncMessage(connectionId, message)
+    return routeMessage(connectionId, message)
 }
 
 func sendMessage(connectionId uint, msg *message) {
