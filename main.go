@@ -4,15 +4,16 @@ package main
 import (
     "ExchatgeServer/database"
     "ExchatgeServer/net"
-    "sync/atomic"
+    "sync"
 )
 
 func main() {
-    var databaseConnected atomic.Bool
-    go database.Init(&databaseConnected)
+    var waitGroup sync.WaitGroup
+    waitGroup.Add(1)
+    go database.Init(&waitGroup)
 
     net.Initialize()
     net.ProcessClients()
 
-    for databaseConnected.Load() {}
+    waitGroup.Wait()
 }

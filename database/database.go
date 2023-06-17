@@ -10,7 +10,7 @@ import (
     "go.mongodb.org/mongo-driver/mongo"
     "go.mongodb.org/mongo-driver/mongo/options"
     "reflect"
-    "sync/atomic"
+    "sync"
 )
 
 const mongoUrl = "mongodb://127.0.0.1:27017/exchatge"
@@ -40,7 +40,7 @@ type database struct {
 }
 var this *database = nil
 
-func Init(databaseConnected *atomic.Bool) { // TODO: authenticate database connection with password
+func Init(waitGroup *sync.WaitGroup) { // TODO: authenticate database connection with password
     ctx := context.TODO()
 
     client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoUrl))
@@ -48,7 +48,7 @@ func Init(databaseConnected *atomic.Bool) { // TODO: authenticate database conne
 
     defer func() {
         utils.Assert(client.Disconnect(ctx) == nil)
-        databaseConnected.Store(false)
+        waitGroup.Done()
     }()
 
     collection := client.Database(databaseName).Collection(collectionUsers)
