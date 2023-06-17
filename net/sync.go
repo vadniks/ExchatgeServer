@@ -97,31 +97,32 @@ func loginWithCredentialsRequested(connectionId uint, msg *message) int32 { // e
     )
 
     user := database.FindUser(username, unhashedPassword)
-
-    if user != nil {
-        connectionStates[connectionId] = stateLoggedWithCredentials
-        sendMessage(connectionId, &message{
-            flag: flagLoggedIn,
-            timestamp: utils.CurrentTimeMillis(),
-            size: 0,
-            index: 0,
-            count: 0,
-            from: fromServer,
-            to: user.Id, // here's how a client obtains his id
-            body: fromServerMessageBodyStub,
-        })
-        return flagProceed
-    } else {
+    if user == nil {
         connectionStates[connectionId] = stateFinishedWithError
         return flagFinishWithError
     }
+
+    connectedUsers[connectionId] = user
+    connectionStates[connectionId] = stateLoggedWithCredentials
+
+    sendMessage(connectionId, &message{
+        flag: flagLoggedIn,
+        timestamp: utils.CurrentTimeMillis(),
+        size: 0,
+        index: 0,
+        count: 0,
+        from: fromServer,
+        to: user.Id, // here's how a client obtains his id
+        body: fromServerMessageBodyStub,
+    })
+    return flagProceed
 }
 
 func syncMessage(connectionId uint, msg *message) int32 {
     utils.Assert(msg != nil)
 
     flag := msg.flag
-    usr := connectedUsers[connectionId]
+    usr := connectedUsers[connectionId] // nillable if user's just connected and not logged in yet
     connectionStates[connectionId] = stateSecureConnectionEstablished
 
     switch flag {
