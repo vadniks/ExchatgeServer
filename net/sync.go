@@ -9,8 +9,7 @@ import (
 const flagProceed int32 = 0x00000000
 const flagFinish int32 = 0x00000001
 const flagFetchAll int32 = 0x00000002
-const flagUsername int32 = 0x00000003
-const flagPassword int32 = 0x00000004
+const flagUsernameAndPassword int32 = 0x00000003
 const flagAuthenticated int32 = 0x00000005
 const flagUnauthenticated int32 = 0x00000006
 const flagRegister int32 = 0x00000007
@@ -19,11 +18,10 @@ const flagRegisterFailed int32 = 0x00000009
 const flagId int32 = 0x0000000a
 const flagAdminShutdown int32 = 0x7fffffff
 
-const fromServer uint32 = 0x7fffffff // TODO: sign messages from server & check signature on client side
+const fromServer uint32 = 0x7fffffff // TODO: encrypt messages from server with asymmetric encryption (server encrypts a message with secret key and client decrypts it with public key)
 
 const stateSecureConnectionEstablished = 0
-const stateUsernameSent = 1
-const statePasswordSent = 2
+const stateUsernameAndPasswordSent = 1
 const stateRegisterRequested = 2 // TODO: deal with registration in the context of connection-related finite state machine
 const stateAuthenticated = 3
 const stateFinished = 4
@@ -58,9 +56,9 @@ func sendMessageToReceiver(msg *message) int32 {
     return flagProceed
 }
 
-func usernameObtained(connectionId uint, msg *message) int32 {
+func usernameAndPasswordObtained(connectionId uint, msg *message) int32 {
     // TODO
-    connectionStates[connectionId] = stateUsernameSent
+    connectionStates[connectionId] = stateUsernameAndPasswordSent
     return flagProceed
 }
 
@@ -87,10 +85,8 @@ func syncMessage(connectionId uint, msg *message) int32 {
             return shutdownRequested(connectionId, usr)
         case flagProceed:
             return sendMessageToReceiver(msg)
-        case flagUsername:
-            return usernameObtained(connectionId, msg)
-        case flagPassword:
-            return passwordObtained(connectionId, msg)
+        case flagUsernameAndPassword:
+            return usernameAndPasswordObtained(connectionId, msg)
         default:
             utils.JustThrow()
     }

@@ -1,13 +1,10 @@
 
 package main
 
-import (
-    "ExchatgeServer/database"
-    "ExchatgeServer/net"
-)
-
 func main() {
-    database.Init()
-    net.Initialize()
-    net.ProcessClients()
+    // TODO: generate server keys asymmetric encryption of messages coming from the server
+
+    //database.Init()
+    //net.Initialize()
+    //net.ProcessClients()
 }
