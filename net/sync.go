@@ -19,8 +19,9 @@ const flagRegisterWithCredentials int32 = 0x00000006
 const flagRegistered int32 = 0x00000007
 const flagSuccess int32 = 0x00000008
 const flagError int32 = 0x00000009
-const flagId int32 = 0x0000000a
-const flagFetchAll int32 = 0x0000000b // TODO: add messages fetching mechanism
+const flagUnauthenticated int32 = 0x0000000a
+const flagId int32 = 0x0000000b
+const flagFetchAll int32 = 0x0000000c // TODO: add messages fetching mechanism
 const flagShutdown int32 = 0x7fffffff
 
 const toAnonymous uint32 = 0x7fffffff
@@ -155,9 +156,13 @@ func routeMessage(connectionId uint, msg *message) int32 {
         utils.Assert(
             connectionStates[connectionId] > 0 &&
             !reflect.DeepEqual(msg.from, fromAnonymous) &&
-            !reflect.DeepEqual(msg.from, fromServer) &&
-            from != nil,
+            !reflect.DeepEqual(msg.from, fromServer),
         )
+
+        if from == nil {
+            sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
+            return flagFinishWithError
+        }
     }
 
     switch flag {
