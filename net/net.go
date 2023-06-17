@@ -4,7 +4,6 @@ package net
 import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/utils"
-    "fmt"
     goNet "net"
     "sync"
     "sync/atomic"
@@ -75,48 +74,16 @@ func unpackMessage(bytes []byte) *message {
 }
 
 func Initialize() {
-    msg := &message{ // TODO: test only
-        flag: 1024,
-        timestamp: 0x7fffffff,
-        size: 512,
-        index: 0,
-        count: 1,
-        to: 1,
-        from: [44]byte{},
-        body: [1024]byte{},
+    var byteOrderChecker uint64 = 0x0123456789abcdef // only on x64 littleEndian data marshalling will work as clients expect
+    utils.Assert(unsafe.Sizeof(uintptr(0)) == 8 && *((*uint8) (unsafe.Pointer(&byteOrderChecker))) == 0xef)
+
+    serverPublicKey, serverSecretKey := crypto.GenerateServerKeys()
+
+    this = &net{
+       serverPublicKey,
+       serverSecretKey,
+       crypto.EncryptedSize(messageSize),
     }
-    for i := 0; i < 44; i++ { msg.from[i] = 'a' }
-    for i := 0; i < 1024; i++ { msg.body[i] = 'b' }
-
-    a := msg.pack()
-    fmt.Println(a)
-    b := unpackMessage(a)
-    fmt.Println(
-        b.flag,
-        b.timestamp,
-        b.size,
-        b.index,
-        b.count,
-        b.to,
-        "\n",
-        byte('a'),
-        byte('b'),
-        "\n",
-        b.from,
-        "\n\n",
-        b.body,
-    )
-
-    //var byteOrderChecker uint64 = 0x0123456789abcdef // only on x64 littleEndian data marshalling will work as clients expect
-    //utils.Assert(unsafe.Sizeof(uintptr(0)) == 8 && *((*uint8) (unsafe.Pointer(&byteOrderChecker))) == 0xef)
-    //
-    //serverPublicKey, serverSecretKey := crypto.GenerateServerKeys()
-    //
-    //this = &net{
-    //    serverPublicKey,
-    //    serverSecretKey,
-    //    crypto.EncryptedSize(messageSize),
-    //}
 }
 
 func ProcessClients() {
