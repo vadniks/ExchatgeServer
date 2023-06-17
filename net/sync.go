@@ -18,10 +18,10 @@ const flagShutdown int32 = 0x7fffffff
 const fromServer uint32 = 0x7fffffff // TODO: sign messages from server & check signature on client side
 
 const stateSecureConnectionEstablished = 0
-const stateUsernameAndPasswordSent = 1
-const stateRegisterRequested = 2 // TODO: deal with registration in the context of connection-related finite state machine
-const stateAuthenticated = 3
-const stateFinished = 4
+const stateLoggedWithCredentials = 1
+const stateRegisteredWithCredentials = 2 // TODO: deal with registration in the context of connection-related finite state machine
+const stateFinishedNormally = 3
+const stateFinishedWithError = 4
 
 var connectedUsers map[uint]*database.User // key is connectionId
 var connectionStates map[uint]uint // map[connectionId]state
@@ -57,15 +57,13 @@ func usernameAndPasswordObtained(connectionId uint, msg *message) int32 {
     // TODO message body size = 1024, hashed size = 128, so: 16 bytes for username and 128 bytes for hashed password = 144 bytes for credentials
     if true {
         // TODO: password correct
-        connectionStates[connectionId] = stateAuthenticated
+        connectionStates[connectionId] = stateLoggedWithCredentials
         return flagProceed
     } else {
         // TODO: password incorrect
-        connectionStates[connectionId] = stateFinished
+        connectionStates[connectionId] = stateFinishedWithError
         return flagFinish
     }
-    connectionStates[connectionId] = stateUsernameAndPasswordSent
-    return flagProceed
 }
 
 func syncMessage(connectionId uint, msg *message) int32 {
