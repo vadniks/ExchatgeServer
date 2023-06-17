@@ -69,7 +69,7 @@ func Decrypt(bytes []byte, key []byte) []byte {
     if err == nil { return decrypted } else { return nil }
 }
 
-func Hash(bytes []byte) []byte { // TODO: test
+func Hash(bytes []byte) []byte {
     return sodium.PWHashStore(string(bytes)).Value()
 }
 
