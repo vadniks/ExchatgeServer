@@ -94,8 +94,12 @@ func shutdownRequested(connectionId uint, user *database.User) int32 {
     return flagProceed
 }
 
+//goland:noinspection GoRedundantConversion (*byte) - just silence that annoying warning already!
 func proceedRequested(msg *message) int32 {
     utils.Assert(msg != nil)
+
+    fromId := crypto.Untokenize(msg.from[:]) // TODO: return previous (uint32-typed) 'from' field to message and add separate field for token
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(msg.from))), crypto.TokenSize), unsafe.Slice((*byte) (unsafe.Pointer(&fromId)), 4))
 
     if toUserConnectionId, toUser := findConnectUsr(msg.to); toUser != nil {
         sendMessage(toUserConnectionId, msg)
