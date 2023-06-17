@@ -5,7 +5,6 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/utils"
     "context"
-    "fmt"
     "go.mongodb.org/mongo-driver/bson"
     "go.mongodb.org/mongo-driver/mongo"
     "go.mongodb.org/mongo-driver/mongo/options"
@@ -22,9 +21,9 @@ const collectionMessages = "messages"
 var adminUsername = []byte{'a', 'd', 'm', 'i', 'n'}
 var adminPassword = crypto.Hash([]byte{'a', 'd', 'm', 'i', 'n'})
 
-const fieldId = "Id"
-const fieldName = "Name"
-const fieldPassword = "Password"
+const fieldId = "id"
+const fieldName = "name"
+const fieldPassword = "password"
 
 type User struct {
     Id uint32 `bson:"id"`
@@ -59,9 +58,11 @@ func Init(waitGroup *sync.WaitGroup) { // TODO: authenticate database connection
 }
 
 func addAdminIfNotExists() {
-    usr := User{Id: 0, Name: adminUsername, Password: adminPassword}
-    if result := this.collection.FindOne(*(this.ctx), usr); result.Err() == mongo.ErrNoDocuments {
-        _, err := this.collection.InsertOne(*(this.ctx), usr)
+    if result := this.collection.FindOne(
+        *(this.ctx),
+        bson.D{{fieldId, 0}, {fieldName, adminUsername}},
+    ); result.Err() == mongo.ErrNoDocuments {
+        _, err := this.collection.InsertOne(*(this.ctx), User{Id: 0, Name: adminUsername, Password: adminPassword})
         utils.Assert(err == nil)
     }
 }
@@ -70,8 +71,8 @@ func mocData() { // TODO: test only
     user1 := &User{1, []byte{'u', 's', 'e', 'r', '1'}, crypto.Hash([]byte{'u', 's', 'e', 'r', '1'})}
     user2 := &User{2, []byte{'u', 's', 'e', 'r', '2'}, crypto.Hash([]byte{'u', 's', 'e', 'r', '2'})}
 
-    if id := CheckUser(user1); id != nil { fmt.Println(id, AddUser(user1)) }
-    if id := CheckUser(user2); id != nil { fmt.Println(id, AddUser(user2)) }
+    if CheckUser(user1) == nil { AddUser(user1) }
+    if CheckUser(user2) == nil { AddUser(user2) }
 }
 
 func IsAdmin(usr *User) bool {
@@ -86,15 +87,10 @@ func IsAdmin(usr *User) bool {
     }
 }
 
-func CheckUser(usr *User) *uint32 { // returns nillable id // TODO: make usernames uniq
+func CheckUser(usr *User) *uint32 { // returns nillable id
     utils.Assert(usr != nil)
 
-    result := this.collection.FindOne(*(this.ctx), bson.D{
-        {fieldName, usr.Name},
-        {fieldPassword, usr.Password},
-    })
-
-    if result.Err() == nil {
+    if result := this.collection.FindOne(*(this.ctx), bson.D{{fieldName, usr.Name}}); result.Err() == nil {
         if temp := new(User); result.Decode(temp) == nil { return &(temp.Id) } else { return nil }
     } else {
         return nil
