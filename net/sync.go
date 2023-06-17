@@ -94,7 +94,7 @@ func loggingInWithCredentialsRequested(connectionId uint, msg *message) int32 { 
 
     user := database.FindUser(username, unhashedPassword)
     if user == nil {
-        sendMessage(connectionId, &message{
+        sendMessage(connectionId, &message{ // TODO: extract creation of a simple message from server to a separate function
             flag: flagError,
             timestamp: utils.CurrentTimeMillis(),
             size: messageBodySize,
