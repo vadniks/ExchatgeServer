@@ -27,9 +27,6 @@ const toAnonymous uint32 = 0x7fffffff
 
 const stateSecureConnectionEstablished = 0
 const stateLoggedWithCredentials = 1
-const stateRegisteredWithCredentials = 2 // TODO: deal with registration in the context of connection-related finite state machine
-const stateFinishedNormally = 3
-const stateFinishedWithError = 4
 
 const usernameSize uint = 16
 const unhashedPasswordSize uint = 16
@@ -97,7 +94,18 @@ func loggingInWithCredentialsRequested(connectionId uint, msg *message) int32 { 
 
     user := database.FindUser(username, unhashedPassword)
     if user == nil {
-        connectionStates[connectionId] = stateFinishedWithError
+        sendMessage(connectionId, &message{
+            flag: flagError,
+            timestamp: utils.CurrentTimeMillis(),
+            size: messageBodySize,
+            index: 0,
+            count: 1,
+            from: fromServer,
+            to: toAnonymous,
+            body: fromServerMessageBodyStub,
+        })
+
+        delete(connectionStates, connectionId)
         return flagFinishWithError
     }
 
@@ -140,6 +148,7 @@ func registrationWithCredentialsRequested(connectionId uint, msg *message) int32
 
 func finishRequested(connectionId uint) int32 {
     delete(connectedUsers, connectionId)
+    delete(connectionStates, connectionId)
     return flagFinish
 }
 
