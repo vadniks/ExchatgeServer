@@ -142,18 +142,21 @@ func finishRequested(connectionId uint) int32 {
 func routeMessage(connectionId uint, msg *message) int32 {
     utils.Assert(msg != nil)
     flag := msg.flag
+    from := crypto.Untokenize(msg.from[:])
 
     if flag == flagLoginWithCredentials || flag == flagRegisterWithCredentials {
         utils.Assert(
             connectionStates[connectionId] == 0 && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
-            reflect.DeepEqual(msg.from, fromAnonymous),
+            reflect.DeepEqual(msg.from, fromAnonymous) &&
+            from == nil,
         )
         connectionStates[connectionId] = stateSecureConnectionEstablished
     } else {
         utils.Assert(
             connectionStates[connectionId] > 0 &&
             !reflect.DeepEqual(msg.from, fromAnonymous) &&
-            !reflect.DeepEqual(msg.from, fromServer),
+            !reflect.DeepEqual(msg.from, fromServer) &&
+            from != nil,
         )
     }
 
