@@ -88,7 +88,7 @@ func IsAdmin(user *User) bool {
         utils.Assert(result.Decode(&temp) == nil)
 
         result := reflect.DeepEqual(temp.Name, user.Name) && reflect.DeepEqual(temp.Password, user.Password)
-        if result { utils.Assert(user.Id == 0) } // TODO: rethink logic as this
+        if result { utils.Assert(user.Id == 0) } // TODO: rethink logic as what we have here is suspicious
         return result
     } else {
         utils.Assert(user.Id != 0)
