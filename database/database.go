@@ -8,6 +8,7 @@ import (
     "go.mongodb.org/mongo-driver/bson"
     "go.mongodb.org/mongo-driver/mongo"
     "go.mongodb.org/mongo-driver/mongo/options"
+    "reflect"
     "sync"
 )
 
@@ -20,6 +21,7 @@ const collectionMessages = "messages"
 var adminUsername = []byte("admin")
 var adminPassword = crypto.Hash([]byte("admin"))
 
+const fieldRealId = "_id"
 const fieldId = "id"
 const fieldName = "name"
 const fieldPassword = "password"
@@ -27,7 +29,7 @@ const fieldPassword = "password"
 type User struct {
     Id uint32 `bson:"id"`
     Name []byte `bson:"name"`
-    Password []byte `bson:"password"`
+    Password []byte `bson:"password"` // salty-hashed
 }
 
 func (user *User) passwordHashed() *User {
@@ -72,11 +74,13 @@ func addAdminIfNotExists() { // admin is the only user that has id equal to 0 TO
 }
 
 func mocData() { // TODO: test only
-    user1 := &User{1, []byte("user1"), []byte("user1")}
-    user2 := &User{2, []byte("user2"), []byte("user2")}
+    user1 := &User{1, []byte("user1"), crypto.Hash([]byte("user1"))}
+    user2 := &User{2, []byte("user2"), crypto.Hash([]byte("user2"))}
 
-    if FindUser(user1.Name, user1.Password) == nil { AddUser(user1.passwordHashed()) }
-    if FindUser(user2.Name, user2.Password) == nil { AddUser(user2.passwordHashed()) }
+    xUser1 := AddUser(user1.Name, user1.Password)
+    xUser2 := AddUser(user2.Name, user2.Password)
+
+    utils.Assert(xUser1.Id == 0 && xUser2.Id == 2)
 }
 
 func IsAdmin(user *User) bool { return user.Id == 0 } // as users are being verified & authenticated right after establishing a connection
@@ -95,8 +99,36 @@ func FindUser(username []byte, unhashedPassword []byte) *User { // nillable resu
     }
 }
 
-func AddUser(user *User) bool {
-    utils.Assert(user != nil)
-    result, err := this.collection.InsertOne(*(this.ctx), *user)
-    return result != nil && err == nil
+func usernameAlreadyInUse(username []byte) bool { // username must be unique
+    utils.Assert(len(username) > 0)
+    result := this.collection.FindOne(*(this.ctx), bson.D{{fieldName, username}})
+    return result.Err() == nil
+}
+
+func availableUserId() uint32 { // TODO: maybe just use the real mongodb's _id?
+    cursor, err := this.collection.Find(*(this.ctx), bson.D{})
+    utils.Assert(err == nil)
+
+    var users []User
+    utils.Assert(cursor.All(*(this.ctx), users) == nil)
+
+    var biggestId uint32 = 0
+    for _, i := range users { if id := i.Id; id > biggestId { biggestId = id } }
+    return biggestId + 1
+}
+
+func AddUser(username []byte, hashedPassword []byte) *User { // nillable result
+    utils.Assert(len(username) > 0 && len(hashedPassword) == int(crypto.HashSize))
+    if usernameAlreadyInUse(username) { return nil }
+
+    result, err := this.collection.InsertOne(*(this.ctx), User{Id: availableUserId(), Name: username, Password: hashedPassword})
+    if result == nil || err != nil { return nil }
+
+    result2 := this.collection.FindOne(*(this.ctx), bson.D{{fieldRealId, result.InsertedID}})
+    utils.Assert(result2.Err() == nil)
+
+    user := new(User)
+    utils.Assert(result2.Decode(user) == nil)
+    utils.Assert(user.Id > 0 && reflect.DeepEqual(username, user.Name) && reflect.DeepEqual(hashedPassword, user.Password))
+    return user
 }

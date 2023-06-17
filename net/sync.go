@@ -11,17 +11,19 @@ import (
 const flagProceed int32 = 0x00000000
 const flagFinish int32 = 0x00000001
 const flagFinishWithError int32 = 0x00000002
-const flagLoginWithCredentials int32 = 0x00000003
-const flagLoggedIn int32 = 0x00000004
-const flagRegisterWithCredentials int32 = 0x00000005
-const flagRegistered int32 = 0x00000006
-const flagSuccess int32 = 0x00000007
-const flagError int32 = 0x00000008
-const flagId int32 = 0x00000009
-const flagFetchAll int32 = 0x0000000a
+const flagFinishToReconnect int32 = 0x00000003 // after registration connection closes and client should reconnect & login
+const flagLoginWithCredentials int32 = 0x00000004
+const flagLoggedIn int32 = 0x00000005
+const flagRegisterWithCredentials int32 = 0x00000006
+const flagRegistered int32 = 0x00000007
+const flagSuccess int32 = 0x00000008
+const flagError int32 = 0x00000009
+const flagId int32 = 0x0000000a
+const flagFetchAll int32 = 0x0000000b // TODO: add messages fetching mechanism
 const flagShutdown int32 = 0x7fffffff
 
-const fromServer uint32 = 0x7fffffff // TODO: sign messages from server & check signature on client side
+const fromServer uint32 = 0x7fffffff
+const toAnonymous uint32 = 0x7fffffff
 
 const stateSecureConnectionEstablished = 0
 const stateLoggedWithCredentials = 1
@@ -49,7 +51,7 @@ func shutdownRequested(connectionId uint, usr *database.User) int32 {
     sendMessage(connectionId, &message{
         flag: flagError,
         timestamp: utils.CurrentTimeMillis(),
-        size: 0,
+        size: messageBodySize,
         index: 0,
         count: 1,
         from: fromServer,
@@ -82,7 +84,7 @@ func parseCredentials(msg *message) (username []byte, unhashedPassword []byte) {
     return username, unhashedPassword
 }
 
-func loginWithCredentialsRequested(connectionId uint, msg *message) int32 { // expects the password not to be hashed in order to compare it with salted hash (which is always different)
+func loggingInWithCredentialsRequested(connectionId uint, msg *message) int32 { // expects the password not to be hashed in order to compare it with salted hash (which is always different)
     utils.Assert(msg != nil)
 
     username, unhashedPassword := parseCredentials(msg)
@@ -105,9 +107,9 @@ func loginWithCredentialsRequested(connectionId uint, msg *message) int32 { // e
     sendMessage(connectionId, &message{
         flag: flagLoggedIn,
         timestamp: utils.CurrentTimeMillis(),
-        size: 0,
+        size: messageBodySize,
         index: 0,
-        count: 0,
+        count: 1,
         from: fromServer,
         to: user.Id, // here's how a client obtains his id
         body: fromServerMessageBodyStub,
@@ -115,14 +117,35 @@ func loginWithCredentialsRequested(connectionId uint, msg *message) int32 { // e
     return flagProceed
 }
 
+func registrationWithCredentialsRequested(connectionId uint, msg *message) int32 {
+    utils.Assert(msg != nil)
+
+    username, unhashedPassword := parseCredentials(msg)
+    user := database.AddUser(username, crypto.Hash(unhashedPassword))
+    successful := user != nil
+
+    sendMessage(connectionId, &message{
+        flag: func() int32 { if successful { return flagRegistered } else { return flagError } }(),
+        timestamp: utils.CurrentTimeMillis(),
+        size: messageBodySize,
+        index: 0,
+        count: 1,
+        from: fromServer,
+        to: func() uint32 { if successful { return user.Id } else { return toAnonymous } }(),
+        body: fromServerMessageBodyStub,
+    })
+
+    if successful { return flagFinishToReconnect } else { return flagError }
+}
+
 func finishRequested(connectionId uint) int32 {
     delete(connectedUsers, connectionId)
     return flagFinish
 }
 
-func syncMessage(connectionId uint, msg *message) int32 {
+func syncMessage(connectionId uint, msg *message) int32 { // TODO: rename to routeMessage or smth
     utils.Assert(msg != nil)
-    connectionStates[connectionId] = stateSecureConnectionEstablished
+    connectionStates[connectionId] = stateSecureConnectionEstablished // TODO: test all
 
     switch msg.flag {
         case flagShutdown:
@@ -130,9 +153,9 @@ func syncMessage(connectionId uint, msg *message) int32 {
         case flagProceed:
             return proceedRequested(msg)
         case flagLoginWithCredentials:
-            return loginWithCredentialsRequested(connectionId, msg)
+            return loggingInWithCredentialsRequested(connectionId, msg)
         case flagRegisterWithCredentials:
-            return flagError // TODO
+            return registrationWithCredentialsRequested(connectionId, msg)
         case flagFinish:
             return finishRequested(connectionId)
         default:
