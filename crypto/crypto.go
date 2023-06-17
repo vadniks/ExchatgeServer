@@ -4,7 +4,6 @@ package crypto
 import "C"
 import (
     "ExchatgeServer/utils"
-    "fmt"
     "github.com/jamesruan/sodium"
     "unsafe"
 )
@@ -74,7 +73,5 @@ func Hash(bytes []byte) []byte { // TODO: test
 }
 
 func CompareWithHash(hash []byte, unhashed []byte) bool {
-    err := sodium.LoadPWHashStr(hash).PWHashVerify(string(unhashed))
-    fmt.Println(err)
-    return err == nil
+    return sodium.LoadPWHashStr(hash).PWHashVerify(string(unhashed)) == nil
 }
