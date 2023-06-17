@@ -128,17 +128,17 @@ func processClient(connectionId uint, waitGroup *sync.WaitGroup, onShutDownReque
     messageBuffer := make([]byte, this.messageBufferSize)
     for {
         if receive(connection, messageBuffer) {
-            switch processClientMessage(connectionId, encryptionKey, messageBuffer) {
+            resultFlag := processClientMessage(connectionId, encryptionKey, messageBuffer)
+            switch resultFlag {
+                case flagFinishWithError:
                 case flagFinish:
-                    waitGroup.Done()
-                    return
-                case flagProceed:
-                    break
                 case flagShutdown:
                     waitGroup.Done()
-                    (*onShutDownRequested)()
-                    return
+                    break
+                case flagProceed:
+                    break
             }
+            if resultFlag == flagShutdown { (*onShutDownRequested)() }
         }
     }
 }

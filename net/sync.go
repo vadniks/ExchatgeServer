@@ -2,17 +2,23 @@
 package net
 
 import (
+    "ExchatgeServer/crypto"
     "ExchatgeServer/database"
     "ExchatgeServer/utils"
+    "unsafe"
 )
 
 const flagProceed int32 = 0x00000000
 const flagFinish int32 = 0x00000001
-const flagFetchAll int32 = 0x00000002
+const flagFinishWithError int32 = 0x00000002
 const flagLoginWithCredentials int32 = 0x00000003
-const flagRegisterWithCredentials int32 = 0x00000004
-const flagError int32 = 0x00000005
-const flagId int32 = 0x00000006
+const flagLoggedIn int32 = 0x00000004
+const flagRegisterWithCredentials int32 = 0x00000005
+const flagRegistered int32 = 0x00000006
+const flagSuccess int32 = 0x00000007
+const flagError int32 = 0x00000008
+const flagId int32 = 0x00000009
+const flagFetchAll int32 = 0x0000000a
 const flagShutdown int32 = 0x7fffffff
 
 const fromServer uint32 = 0x7fffffff // TODO: sign messages from server & check signature on client side
@@ -22,6 +28,8 @@ const stateLoggedWithCredentials = 1
 const stateRegisteredWithCredentials = 2 // TODO: deal with registration in the context of connection-related finite state machine
 const stateFinishedNormally = 3
 const stateFinishedWithError = 4
+
+const usernameSize uint = 16
 
 var connectedUsers map[uint]*database.User // key is connectionId
 var connectionStates map[uint]uint // map[connectionId]state
@@ -46,7 +54,7 @@ func shutdownRequested(connectionId uint, usr *database.User) int32 {
     }
 }
 
-func sendMessageToReceiver(msg *message) int32 {
+func proceedRequested(msg *message) int32 {
     utils.Assert(msg != nil)
 
     if toUserConnectionId, toUser := findConnectUsr(msg.to); toUser != nil {
@@ -59,21 +67,41 @@ func sendMessageToReceiver(msg *message) int32 {
 
 func parseCredentials(msg *message) (username []byte, passwordHash []byte) {
     utils.Assert(msg != nil && (msg.flag == flagLoginWithCredentials || msg.flag == flagRegisterWithCredentials))
-    return []byte{}, []byte{} // TODO
+
+    username = make([]byte, usernameSize)
+    copy(username, unsafe.Slice(&(msg.body[0]), usernameSize))
+
+    passwordHash = make([]byte, crypto.HashSize)
+    copy(passwordHash, unsafe.Slice(&(msg.body[usernameSize]), crypto.HashSize))
+
+    return username, passwordHash
 }
 
 func loginWithCredentialsRequested(connectionId uint, msg *message) int32 {
     utils.Assert(msg != nil)
 
-    // TODO message body size = 1024, hashed size = 128, so: 16 bytes for username and 128 bytes for hashed password = 144 bytes for credentials
-    if true {
-        // TODO: password correct
+    username, passwordHash := parseCredentials(msg)
+    userId := database.CheckUser(&database.User{
+        Name: username,
+        Password: passwordHash,
+    })
+
+    if userId != nil {
         connectionStates[connectionId] = stateLoggedWithCredentials
+        sendMessage(connectionId, &message{
+            flag: flagLoggedIn,
+            timestamp: utils.CurrentTimeMillis(),
+            size: 0,
+            index: 0,
+            count: 0,
+            from: fromServer,
+            to: *userId, // here's how a client obtains his id
+            body: [1024]byte{},
+        })
         return flagProceed
     } else {
-        // TODO: password incorrect
         connectionStates[connectionId] = stateFinishedWithError
-        return flagFinish
+        return flagFinishWithError
     }
 }
 
@@ -88,7 +116,7 @@ func syncMessage(connectionId uint, msg *message) int32 {
         case flagShutdown:
             return shutdownRequested(connectionId, usr)
         case flagProceed:
-            return sendMessageToReceiver(msg)
+            return proceedRequested(msg)
         case flagLoginWithCredentials:
             return loginWithCredentialsRequested(connectionId, msg)
         default:

@@ -65,8 +65,8 @@ func mocData() { // TODO: test only
     user1 := &User{1, []byte{'u', 's', 'e', 'r', '1'}, crypto.Hash([]byte{'u', 's', 'e', 'r', '1'})}
     user2 := &User{2, []byte{'u', 's', 'e', 'r', '2'}, crypto.Hash([]byte{'u', 's', 'e', 'r', '2'})}
 
-    if !CheckUser(user1) { AddUser(user1) }
-    if !CheckUser(user2) { AddUser(user2) }
+    if CheckUser(user1) != nil { AddUser(user1) }
+    if CheckUser(user2) != nil { AddUser(user2) }
 }
 
 func IsAdmin(usr *User) bool {
@@ -81,13 +81,19 @@ func IsAdmin(usr *User) bool {
     }
 }
 
-func CheckUser(usr *User) bool { // TODO: make usernames uniq
+func CheckUser(usr *User) *uint32 { // returns nillable id // TODO: make usernames uniq
     utils.Assert(usr != nil)
 
-    return this.collection.FindOne(*(this.ctx), bson.D{
+    result := this.collection.FindOne(*(this.ctx), bson.D{
         {fieldName, usr.Name},
         {fieldPassword, usr.Password},
-    }).Err() == nil
+    })
+
+    if result.Err() == nil {
+        if temp := new(User); result.Decode(temp) == nil { return &(temp.Id) } else { return nil }
+    } else {
+        return nil
+    }
 }
 
 func AddUser(usr *User) bool {
