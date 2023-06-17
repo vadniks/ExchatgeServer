@@ -5,6 +5,7 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/utils"
     "context"
+    "fmt"
     "go.mongodb.org/mongo-driver/bson"
     "go.mongodb.org/mongo-driver/mongo"
     "go.mongodb.org/mongo-driver/mongo/options"
@@ -65,8 +66,8 @@ func mocData() { // TODO: test only
     user1 := &User{1, []byte{'u', 's', 'e', 'r', '1'}, crypto.Hash([]byte{'u', 's', 'e', 'r', '1'})}
     user2 := &User{2, []byte{'u', 's', 'e', 'r', '2'}, crypto.Hash([]byte{'u', 's', 'e', 'r', '2'})}
 
-    if CheckUser(user1) != nil { AddUser(user1) }
-    if CheckUser(user2) != nil { AddUser(user2) }
+    if id := CheckUser(user1); id != nil { fmt.Println(id, AddUser(user1)) }
+    if id := CheckUser(user2); id != nil { fmt.Println(id, AddUser(user2)) }
 }
 
 func IsAdmin(usr *User) bool {
