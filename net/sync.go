@@ -35,7 +35,7 @@ const unhashedPasswordSize uint = 16
 var connectedUsers map[uint]*database.User // key is connectionId
 var connectionStates map[uint]uint // map[connectionId]state
 
-var fromServerMessageBodyStub = func() [messageBodySize]byte {
+var fromServerMessageBodyStub = func() [messageBodySize]byte { // letting clients to verify server's signature
     signed := crypto.Sign(make([]byte, messageBodySize - crypto.SignatureSize))
     var arr [messageBodySize]byte
     copy(unsafe.Slice(&(arr[0]), messageBodySize), signed)
@@ -44,22 +44,19 @@ var fromServerMessageBodyStub = func() [messageBodySize]byte {
 
 func shutdownRequested(connectionId uint, usr *database.User) int32 {
     utils.Assert(usr != nil)
+    if database.IsAdmin(usr) { return flagShutdown }
 
-    if database.IsAdmin(usr) {
-        return flagShutdown
-    } else {
-        sendMessage(connectionId, &message{
-            flag: flagError,
-            timestamp: utils.CurrentTimeMillis(),
-            size: 0,
-            index: 0,
-            count: 1,
-            from: fromServer,
-            to: usr.Id,
-            body: fromServerMessageBodyStub,
-        })
-        return flagProceed
-    }
+    sendMessage(connectionId, &message{
+        flag: flagError,
+        timestamp: utils.CurrentTimeMillis(),
+        size: 0,
+        index: 0,
+        count: 1,
+        from: fromServer,
+        to: usr.Id,
+        body: fromServerMessageBodyStub,
+    })
+    return flagProceed
 }
 
 func proceedRequested(msg *message) int32 {

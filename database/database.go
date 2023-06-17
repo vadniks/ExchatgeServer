@@ -8,7 +8,6 @@ import (
     "go.mongodb.org/mongo-driver/bson"
     "go.mongodb.org/mongo-driver/mongo"
     "go.mongodb.org/mongo-driver/mongo/options"
-    "reflect"
     "sync"
 )
 
@@ -80,21 +79,7 @@ func mocData() { // TODO: test only
     if FindUser(user2.Name, user2.Password) == nil { AddUser(user2.passwordHashed()) }
 }
 
-func IsAdmin(user *User) bool {
-    utils.Assert(user != nil)
-
-    if result := this.collection.FindOne(*(this.ctx), bson.D{{fieldId, 0}}); result.Err() == nil {
-        var temp User
-        utils.Assert(result.Decode(&temp) == nil)
-
-        result := reflect.DeepEqual(temp.Name, user.Name) && reflect.DeepEqual(temp.Password, user.Password)
-        if result { utils.Assert(user.Id == 0) } // TODO: rethink logic as what we have here is suspicious
-        return result
-    } else {
-        utils.Assert(user.Id != 0)
-        return false
-    }
-}
+func IsAdmin(user *User) bool { return user.Id == 0 } // as users are being verified & authenticated right after establishing a connection
 
 func FindUser(username []byte, unhashedPassword []byte) *User { // nillable result
     utils.Assert(len(username) > 0 && len(unhashedPassword) > 0)
