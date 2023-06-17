@@ -40,23 +40,25 @@ type message struct {
 var connections map[uint]*goNet.Conn
 
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
-func (message *message) pack() []byte {
+func (msg *message) pack() []byte {
+    utils.Assert(msg != nil)
     bytes := make([]byte, messageSize)
 
-    copy(unsafe.Slice(&(bytes[0]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize]), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.timestamp))), longSize))
-    copy(unsafe.Slice(&(bytes[intSize + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 4 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.from))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 5 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(message.to))), intSize))
+    copy(unsafe.Slice(&(bytes[0]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.flag))), intSize))
+    copy(unsafe.Slice(&(bytes[intSize]), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.timestamp))), longSize))
+    copy(unsafe.Slice(&(bytes[intSize + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.size))), intSize))
+    copy(unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.index))), intSize))
+    copy(unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.count))), intSize))
+    copy(unsafe.Slice(&(bytes[intSize * 4 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.from))), intSize))
+    copy(unsafe.Slice(&(bytes[intSize * 5 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.to))), intSize))
 
-    copy(unsafe.Slice(&(bytes[messageHeadSize]), messageBodySize), unsafe.Slice(&(message.body[0]), messageBodySize))
+    copy(unsafe.Slice(&(bytes[messageHeadSize]), messageBodySize), unsafe.Slice(&(msg.body[0]), messageBodySize))
     return bytes
 }
 
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
 func unpackMessage(bytes []byte) *message {
+    utils.Assert(len(bytes) > 0)
     message := new(message) // TODO: make generic lambda to copy bytes
 
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), intSize), unsafe.Slice(&(bytes[0]), intSize))
@@ -112,6 +114,7 @@ func ProcessClients() {
 }
 
 func processClient(connectionId uint, waitGroup *sync.WaitGroup, onShutDownRequested *func()) {
+    utils.Assert(waitGroup != nil && onShutDownRequested != nil)
     connection := connections[connectionId]
 
     send(connection, this.serverPublicKey)
@@ -141,24 +144,34 @@ func processClient(connectionId uint, waitGroup *sync.WaitGroup, onShutDownReque
 }
 
 func send(connection *goNet.Conn, payload []byte) {
+    utils.Assert(connection != nil && len(payload) > 0)
     count, err := (*connection).Write(payload)
     utils.Assert(count == len(payload) && err == nil)
 }
 
 func receive(connection *goNet.Conn, buffer []byte) bool {
+    utils.Assert(connection != nil && len(buffer) > 0)
+
     count, err := (*connection).Read(buffer)
     utils.Assert(err == nil)
+
     return count == len(buffer)
 }
 
 func processClientMessage(connectionId uint, encryptionKey []byte, messageBytes []byte) int32 {
+    utils.Assert(len(encryptionKey) > 0 && len(messageBytes) > 0)
+
     decrypted := crypto.Decrypt(messageBytes, encryptionKey)
     message := unpackMessage(decrypted)
+
     return syncMessage(connectionId, message)
 }
 
 func sendMessage(connectionId uint, msg *message) {
+    utils.Assert(msg != nil)
+
     connection := connections[connectionId]
     utils.Assert(connection != nil)
+
     send(connection, msg.pack())
 }

@@ -27,6 +27,8 @@ var connectedUsers map[uint]*database.User // key is connectionId
 var connectionStates map[uint]uint // map[connectionId]state
 
 func shutdownRequested(connectionId uint, usr *database.User) int32 {
+    utils.Assert(usr != nil)
+
     if database.IsAdmin(usr) {
         return flagShutdown
     } else {
@@ -45,6 +47,8 @@ func shutdownRequested(connectionId uint, usr *database.User) int32 {
 }
 
 func sendMessageToReceiver(msg *message) int32 {
+    utils.Assert(msg != nil)
+
     if toUserConnectionId, toUser := findConnectUsr(msg.to); toUser != nil {
         sendMessage(toUserConnectionId, msg)
     } else {
@@ -53,7 +57,14 @@ func sendMessageToReceiver(msg *message) int32 {
     return flagProceed
 }
 
-func usernameAndPasswordObtained(connectionId uint, msg *message) int32 {
+func parseCredentials(msg *message) (username []byte, passwordHash []byte) {
+    utils.Assert(msg != nil)
+    return []byte{}, []byte{} // TODO
+}
+
+func loginWithCredentialsRequested(connectionId uint, msg *message) int32 {
+    utils.Assert(msg != nil)
+
     // TODO message body size = 1024, hashed size = 128, so: 16 bytes for username and 128 bytes for hashed password = 144 bytes for credentials
     if true {
         // TODO: password correct
@@ -67,6 +78,8 @@ func usernameAndPasswordObtained(connectionId uint, msg *message) int32 {
 }
 
 func syncMessage(connectionId uint, msg *message) int32 {
+    utils.Assert(msg != nil)
+
     flag := msg.flag
     usr := connectedUsers[connectionId]
     connectionStates[connectionId] = stateSecureConnectionEstablished
@@ -77,7 +90,7 @@ func syncMessage(connectionId uint, msg *message) int32 {
         case flagProceed:
             return sendMessageToReceiver(msg)
         case flagLoginWithCredentials:
-            return usernameAndPasswordObtained(connectionId, msg)
+            return loginWithCredentialsRequested(connectionId, msg)
         default:
             utils.JustThrow()
     }

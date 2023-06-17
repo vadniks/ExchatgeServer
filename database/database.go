@@ -70,6 +70,8 @@ func mocData() { // TODO: test only
 }
 
 func IsAdmin(usr *User) bool {
+    utils.Assert(usr != nil)
+
     if result := this.collection.FindOne(*(this.ctx), bson.D{{fieldId, 0}}); result.Err() == nil {
         var temp User
         utils.Assert(result.Decode(&temp) == nil)
@@ -80,6 +82,8 @@ func IsAdmin(usr *User) bool {
 }
 
 func CheckUser(usr *User) bool { // TODO: make usernames uniq
+    utils.Assert(usr != nil)
+
     return this.collection.FindOne(*(this.ctx), bson.D{
         {fieldName, usr.Name},
         {fieldPassword, usr.Password},
@@ -87,6 +91,7 @@ func CheckUser(usr *User) bool { // TODO: make usernames uniq
 }
 
 func AddUser(usr *User) bool {
+    utils.Assert(usr != nil)
     result, err := this.collection.InsertOne(*(this.ctx), *usr)
     return result != nil && err == nil
 }
