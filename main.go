@@ -8,7 +8,7 @@ import (
 
 func main() {
     token := crypto.Tokenize(1)
-    fmt.Println(*(crypto.Untokenize(token)), token) // TODO: add token
+    fmt.Println(*(crypto.Untokenize(token)), len(token), token) // TODO: add token whose size is 44 bytes
 
     //var waitGroup sync.WaitGroup
     //waitGroup.Add(1)
