@@ -1,7 +1,6 @@
 
 package crypto
 
-import "C"
 import (
     "ExchatgeServer/utils"
     "github.com/jamesruan/sodium"
