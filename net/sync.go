@@ -30,6 +30,7 @@ const stateFinishedNormally = 3
 const stateFinishedWithError = 4
 
 const usernameSize uint = 16
+const unhashedPasswordSize uint = 16
 
 var connectedUsers map[uint]*database.User // key is connectionId
 var connectionStates map[uint]uint // map[connectionId]state
@@ -84,10 +85,17 @@ func parseCredentials(msg *message) (username []byte, unhashedPassword []byte) {
     return username, unhashedPassword
 }
 
-func loginWithCredentialsRequested(connectionId uint, msg *message) int32 {
+func loginWithCredentialsRequested(connectionId uint, msg *message) int32 { // expects the password not to be hashed in order to compare it with salted hash (which is always different)
     utils.Assert(msg != nil)
 
     username, unhashedPassword := parseCredentials(msg)
+
+    xUsernameSize := uint(len(username)); passwordSize := uint(len(unhashedPassword))
+    utils.Assert(
+        xUsernameSize > 0 && xUsernameSize <= usernameSize &&
+        passwordSize > 0 && passwordSize <= unhashedPasswordSize,
+    )
+
     user := database.FindUser(username, unhashedPassword)
 
     if user != nil {
