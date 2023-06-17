@@ -11,6 +11,7 @@ import (
 const KeySize uint = 32
 const macSize uint = 16
 const nonceSize uint = 24
+const HashSize uint = 128
 
 func GenerateServerKeys() ([]byte, []byte) {
     serverKeys := sodium.MakeKXKP()
