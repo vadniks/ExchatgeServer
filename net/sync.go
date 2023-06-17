@@ -57,13 +57,7 @@ func sendMessageToReceiver(msg *message) int32 {
 }
 
 func usernameAndPasswordObtained(connectionId uint, msg *message) int32 {
-    // TODO
-    connectionStates[connectionId] = stateUsernameAndPasswordSent
-    return flagProceed
-}
-
-func passwordObtained(connectionId uint, msg *message) int32 {
-    // TODO
+    // TODO message body size = 1024, hashed size = 128, so: 16 bytes for username and 128 bytes for hashed password = 144 bytes for credentials
     if true {
         // TODO: password correct
         connectionStates[connectionId] = stateAuthenticated
@@ -73,6 +67,8 @@ func passwordObtained(connectionId uint, msg *message) int32 {
         connectionStates[connectionId] = stateFinished
         return flagFinish
     }
+    connectionStates[connectionId] = stateUsernameAndPasswordSent
+    return flagProceed
 }
 
 func syncMessage(connectionId uint, msg *message) int32 {
