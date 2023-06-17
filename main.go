@@ -5,6 +5,7 @@ import (
     "ExchatgeServer/crypto"
     "fmt"
     "github.com/jamesruan/sodium"
+    "unsafe"
 )
 
 func main() {
@@ -20,6 +21,20 @@ func main() {
     fmt.Println(string(msg2), err)
 
     fmt.Println(crypto.CompareWithHash(signedHash, signed))
+
+    //
+
+    const danglingSize = 30 // sodium.PWHashStore hash func produces salty-hash with dangling zeroes, cut them off
+    id := 1
+    idBytes := make([]byte, 4)
+    copy(idBytes, unsafe.Slice((*byte) (unsafe.Pointer(&id)), 4))
+    signedId := sodium.Bytes(idBytes).Sign(skp.SecretKey) // stays on server
+    truncatedHashedSignedId := crypto.Hash(signedId)[:crypto.HashSize - danglingSize] // goes to client as a token (or as a fromId (id of a sender) replacement)
+
+    trueHashedSignedId := make([]byte, crypto.HashSize)
+    copy(trueHashedSignedId, truncatedHashedSignedId)
+    for i := crypto.HashSize - danglingSize; i < crypto.HashSize; i++ { trueHashedSignedId[i] = 0 }
+    fmt.Println("aaa", len(truncatedHashedSignedId), crypto.CompareWithHash(trueHashedSignedId, signedId)) // TODO: 98 bytes for a token
 
     //var waitGroup sync.WaitGroup
     //waitGroup.Add(1)
