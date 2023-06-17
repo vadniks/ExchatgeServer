@@ -34,6 +34,13 @@ const usernameSize uint = 16
 var connectedUsers map[uint]*database.User // key is connectionId
 var connectionStates map[uint]uint // map[connectionId]state
 
+var fromServerMessageBodyStub = func() [messageBodySize]byte {
+    signed := crypto.Sign(make([]byte, messageBodySize - crypto.SignatureSize))
+    var arr [messageBodySize]byte
+    copy(unsafe.Slice(&(arr[0]), messageBodySize), signed)
+    return arr
+}()
+
 func shutdownRequested(connectionId uint, usr *database.User) int32 {
     utils.Assert(usr != nil)
 
@@ -48,7 +55,7 @@ func shutdownRequested(connectionId uint, usr *database.User) int32 {
             count: 1,
             from: fromServer,
             to: usr.Id,
-            body: [1024]byte{},
+            body: fromServerMessageBodyStub,
         })
         return flagProceed
     }
@@ -96,7 +103,7 @@ func loginWithCredentialsRequested(connectionId uint, msg *message) int32 {
             count: 0,
             from: fromServer,
             to: *userId, // here's how a client obtains his id
-            body: [1024]byte{},
+            body: fromServerMessageBodyStub,
         })
         return flagProceed
     } else {
