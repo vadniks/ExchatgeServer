@@ -63,6 +63,29 @@ func simpleServerMessage(xFlag int32, xTo uint32) *message {
     }
 }
 
+func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
+    bodySize := len(xBody)
+    maxBodySize := messageBodySize - crypto.SignatureSize
+    utils.Assert(bodySize > 0 && bodySize <= int(maxBodySize))
+
+    signed := crypto.Sign(xBody)
+    utils.Assert(len(signed) == messageBodySize)
+
+    result := &message{
+        flag: xFlag,
+        timestamp: utils.CurrentTimeMillis(),
+        size: uint32(bodySize),
+        index: 0,
+        count: 1,
+        from: fromServer,
+        to: xTo,
+        body: [messageBodySize]byte{},
+    }
+
+    copy(unsafe.Slice(&(result.body[0]), messageBodySize), signed)
+    return result
+}
+
 func shutdownRequested(connectionId uint, user *database.User) int32 {
     utils.Assert(user != nil)
     if database.IsAdmin(user) { return flagShutdown }
@@ -107,15 +130,15 @@ func loggingInWithCredentialsRequested(connectionId uint, msg *message) int32 { 
 
     user := database.FindUser(username, unhashedPassword)
     if user == nil {
-        sendMessage(connectionId, simpleServerMessage(flagError, toAnonymous))
-        delete(connectionStates, connectionId)
+        sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
+        finishRequested(connectionId)
         return flagFinishWithError
     }
 
     connectedUsers[connectionId] = user
     connectionStates[connectionId] = stateLoggedWithCredentials
 
-    sendMessage(connectionId, simpleServerMessage(flagLoggedIn, user.Id)) // here's how a client obtains his id
+    sendMessage(connectionId, serverMessage(flagLoggedIn, toAnonymous, crypto.Tokenize(user.Id))) // here's how a client obtains his id
     return flagProceed
 }
 
@@ -161,6 +184,7 @@ func routeMessage(connectionId uint, msg *message) int32 {
 
         if from == nil {
             sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
+            finishRequested(connectionId)
             return flagFinishWithError
         }
     }
