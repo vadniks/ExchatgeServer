@@ -98,7 +98,7 @@ func Tokenize(id uint32) (tokenReference []byte, tokenItself []byte) {
     copy(idBytes, unsafe.Slice((*byte) (unsafe.Pointer(&id)), 4))
 
     signedId := sodium.Bytes(idBytes).Sign(tokenSignKeypair.SecretKey)
-    truncatedHashedSignedId := Hash(signedId)[:HashSize -hashDanglingZeroBytesSize]
+    truncatedHashedSignedId := Hash(signedId)[:HashSize - hashDanglingZeroBytesSize]
 
     return signedId, truncatedHashedSignedId
 }
