@@ -48,7 +48,7 @@ func simpleServerMessage(xFlag int32, xTo uint32) *message {
         size: messageBodySize,
         index: 0,
         count: 1,
-        from: fromServer,
+        from: [44]byte{},//fromServer, // TODO
         to: xTo,
         body: fromServerMessageBodyStub,
     }

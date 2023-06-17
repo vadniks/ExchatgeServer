@@ -4,6 +4,7 @@ package net
 import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/utils"
+    "fmt"
     goNet "net"
     "sync"
     "sync/atomic"
@@ -12,9 +13,9 @@ import (
 
 const host = "localhost:8080"
 
-const messageHeadSize = 4 * 6 + 8 // 32
+const messageHeadSize = 4 * 5 + 8 + crypto.TokenSize // 72
 const messageBodySize = 1 << 10 // 1024
-const messageSize = messageHeadSize + messageBodySize // 1056
+const messageSize = messageHeadSize + messageBodySize // 1096
 
 const intSize = 4
 const longSize = 8
@@ -32,8 +33,8 @@ type message struct {
     size uint32
     index uint32
     count uint32
-    from uint32
     to uint32
+    from [crypto.TokenSize]byte // TODO: generate server token for each connection
     body [messageBodySize]byte // TODO: generate permanent encryption key for each conversation and store encrypted messages in a database
 }
 
@@ -49,8 +50,8 @@ func (msg *message) pack() []byte {
     copy(unsafe.Slice(&(bytes[intSize + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.size))), intSize))
     copy(unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.index))), intSize))
     copy(unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.count))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 4 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.from))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 5 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.to))), intSize))
+    copy(unsafe.Slice(&(bytes[intSize * 4 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.to))), intSize))
+    copy(unsafe.Slice(&(bytes[intSize * 5 + longSize]), crypto.TokenSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.from))), crypto.TokenSize))
 
     copy(unsafe.Slice(&(bytes[messageHeadSize]), messageBodySize), unsafe.Slice(&(msg.body[0]), messageBodySize))
     return bytes
@@ -66,24 +67,56 @@ func unpackMessage(bytes []byte) *message {
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), intSize), unsafe.Slice(&(bytes[intSize + longSize]), intSize))
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), intSize), unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize))
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), intSize), unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.from))), intSize), unsafe.Slice(&(bytes[intSize * 4 + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.to))), intSize), unsafe.Slice(&(bytes[intSize * 5 + longSize]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.to))), intSize), unsafe.Slice(&(bytes[intSize * 4 + longSize]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.from))), crypto.TokenSize), unsafe.Slice(&(bytes[intSize * 5 + longSize]), crypto.TokenSize))
 
     copy(unsafe.Slice(&(message.body[0]), messageBodySize), unsafe.Slice(&(bytes[messageHeadSize]), messageBodySize))
     return message
 }
 
 func Initialize() {
-    var byteOrderChecker uint64 = 0x0123456789abcdef // only on x64 littleEndian data marshalling will work as clients expect
-    utils.Assert(unsafe.Sizeof(uintptr(0)) == 8 && *((*uint8) (unsafe.Pointer(&byteOrderChecker))) == 0xef)
-
-    serverPublicKey, serverSecretKey := crypto.GenerateServerKeys()
-
-    this = &net{
-        serverPublicKey,
-        serverSecretKey,
-        crypto.EncryptedSize(messageSize),
+    msg := &message{ // TODO: test only
+        flag: 1024,
+        timestamp: 0x7fffffff,
+        size: 512,
+        index: 0,
+        count: 1,
+        to: 1,
+        from: [44]byte{},
+        body: [1024]byte{},
     }
+    for i := 0; i < 44; i++ { msg.from[i] = 'a' }
+    for i := 0; i < 1024; i++ { msg.body[i] = 'b' }
+
+    a := msg.pack()
+    fmt.Println(a)
+    b := unpackMessage(a)
+    fmt.Println(
+        b.flag,
+        b.timestamp,
+        b.size,
+        b.index,
+        b.count,
+        b.to,
+        "\n",
+        byte('a'),
+        byte('b'),
+        "\n",
+        b.from,
+        "\n\n",
+        b.body,
+    )
+
+    //var byteOrderChecker uint64 = 0x0123456789abcdef // only on x64 littleEndian data marshalling will work as clients expect
+    //utils.Assert(unsafe.Sizeof(uintptr(0)) == 8 && *((*uint8) (unsafe.Pointer(&byteOrderChecker))) == 0xef)
+    //
+    //serverPublicKey, serverSecretKey := crypto.GenerateServerKeys()
+    //
+    //this = &net{
+    //    serverPublicKey,
+    //    serverSecretKey,
+    //    crypto.EncryptedSize(messageSize),
+    //}
 }
 
 func ProcessClients() {
