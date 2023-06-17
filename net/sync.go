@@ -41,20 +41,24 @@ var fromServerMessageBodyStub = func() [messageBodySize]byte { // letting client
     return arr
 }()
 
-func shutdownRequested(connectionId uint, usr *database.User) int32 {
-    utils.Assert(usr != nil)
-    if database.IsAdmin(usr) { return flagShutdown }
-
-    sendMessage(connectionId, &message{
-        flag: flagError,
+func simpleServerMessage(xFlag int32, xTo uint32) *message {
+    return &message{
+        flag: xFlag,
         timestamp: utils.CurrentTimeMillis(),
         size: messageBodySize,
         index: 0,
         count: 1,
         from: fromServer,
-        to: usr.Id,
+        to: xTo,
         body: fromServerMessageBodyStub,
-    })
+    }
+}
+
+func shutdownRequested(connectionId uint, user *database.User) int32 {
+    utils.Assert(user != nil)
+    if database.IsAdmin(user) { return flagShutdown }
+
+    sendMessage(connectionId, simpleServerMessage(flagError, user.Id))
     return flagProceed
 }
 
@@ -69,7 +73,7 @@ func proceedRequested(msg *message) int32 {
     return flagProceed
 }
 
-func parseCredentials(msg *message) (username []byte, unhashedPassword []byte) {
+func parseCredentials(msg *message) (username []byte, unhashedPassword []byte) { // TODO: add token protection or encrypt/sign user id
     utils.Assert(msg != nil && (msg.flag == flagLoginWithCredentials || msg.flag == flagRegisterWithCredentials))
 
     username = make([]byte, usernameSize)
@@ -94,17 +98,7 @@ func loggingInWithCredentialsRequested(connectionId uint, msg *message) int32 { 
 
     user := database.FindUser(username, unhashedPassword)
     if user == nil {
-        sendMessage(connectionId, &message{ // TODO: extract creation of a simple message from server to a separate function
-            flag: flagError,
-            timestamp: utils.CurrentTimeMillis(),
-            size: messageBodySize,
-            index: 0,
-            count: 1,
-            from: fromServer,
-            to: toAnonymous,
-            body: fromServerMessageBodyStub,
-        })
-
+        sendMessage(connectionId, simpleServerMessage(flagError, toAnonymous))
         delete(connectionStates, connectionId)
         return flagFinishWithError
     }
@@ -112,16 +106,7 @@ func loggingInWithCredentialsRequested(connectionId uint, msg *message) int32 { 
     connectedUsers[connectionId] = user
     connectionStates[connectionId] = stateLoggedWithCredentials
 
-    sendMessage(connectionId, &message{
-        flag: flagLoggedIn,
-        timestamp: utils.CurrentTimeMillis(),
-        size: messageBodySize,
-        index: 0,
-        count: 1,
-        from: fromServer,
-        to: user.Id, // here's how a client obtains his id
-        body: fromServerMessageBodyStub,
-    })
+    sendMessage(connectionId, simpleServerMessage(flagLoggedIn, user.Id)) // here's how a client obtains his id
     return flagProceed
 }
 
@@ -132,16 +117,10 @@ func registrationWithCredentialsRequested(connectionId uint, msg *message) int32
     user := database.AddUser(username, crypto.Hash(unhashedPassword))
     successful := user != nil
 
-    sendMessage(connectionId, &message{
-        flag: func() int32 { if successful { return flagRegistered } else { return flagError } }(),
-        timestamp: utils.CurrentTimeMillis(),
-        size: messageBodySize,
-        index: 0,
-        count: 1,
-        from: fromServer,
-        to: func() uint32 { if successful { return user.Id } else { return toAnonymous } }(),
-        body: fromServerMessageBodyStub,
-    })
+    sendMessage(connectionId, simpleServerMessage( // Lack of ternary operator is awful
+        func() int32 { if successful { return flagRegistered } else { return flagError } }(),
+        func() uint32 { if successful { return user.Id } else { return toAnonymous } }(),
+    ))
 
     if successful { return flagFinishToReconnect } else { return flagError }
 }
