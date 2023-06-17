@@ -22,7 +22,6 @@ const flagId int32 = 0x0000000a
 const flagFetchAll int32 = 0x0000000b // TODO: add messages fetching mechanism
 const flagShutdown int32 = 0x7fffffff
 
-const fromServer uint32 = 0x7fffffff
 const toAnonymous uint32 = 0x7fffffff
 
 const stateSecureConnectionEstablished = 0
@@ -33,6 +32,12 @@ const unhashedPasswordSize uint = 16
 
 var connectedUsers map[uint]*database.User // key is connectionId
 var connectionStates map[uint]uint // map[connectionId]state
+
+var fromServer = func() [crypto.TokenSize]byte {
+   var bytes [crypto.TokenSize]byte
+   for i, _ := range bytes { bytes[i] = 0xff }
+   return bytes
+}()
 
 var fromServerMessageBodyStub = func() [messageBodySize]byte { // letting clients to verify server's signature
     signed := crypto.Sign(make([]byte, messageBodySize - crypto.SignatureSize))
@@ -48,7 +53,7 @@ func simpleServerMessage(xFlag int32, xTo uint32) *message {
         size: messageBodySize,
         index: 0,
         count: 1,
-        from: [44]byte{},//fromServer, // TODO
+        from: fromServer,
         to: xTo,
         body: fromServerMessageBodyStub,
     }
