@@ -19,7 +19,7 @@ const flagRegisterFailed int32 = 0x00000009
 const flagId int32 = 0x0000000a
 const flagAdminShutdown int32 = 0x7fffffff
 
-const fromServer uint32 = 0x7fffffff
+const fromServer uint32 = 0x7fffffff // TODO: sign messages from server & check signature on client side
 
 const stateSecureConnectionEstablished = 0
 const stateUsernameSent = 1

@@ -4,6 +4,7 @@ package crypto
 import "C"
 import (
     "ExchatgeServer/utils"
+    "fmt"
     "github.com/jamesruan/sodium"
     "unsafe"
 )
@@ -11,7 +12,6 @@ import (
 const KeySize uint = 32
 const macSize uint = 16
 const nonceSize uint = 24
-const hashSize uint = 32
 
 func GenerateServerKeys() ([]byte, []byte) {
     serverKeys := sodium.MakeKXKP()
@@ -70,8 +70,11 @@ func Decrypt(bytes []byte, key []byte) []byte {
 }
 
 func Hash(bytes []byte) []byte { // TODO: test
-    hash := sodium.NewGenericHash(int(hashSize))
-    count, err := hash.Write(bytes)
-    utils.Assert(count == len(bytes) && err == nil)
-    return hash.Sum([]byte{})
+    return sodium.PWHashStore(string(bytes)).Value()
+}
+
+func CompareWithHash(hash []byte, unhashed []byte) bool {
+    err := sodium.LoadPWHashStr(hash).PWHashVerify(string(unhashed))
+    fmt.Println(err)
+    return err == nil
 }
