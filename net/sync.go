@@ -23,6 +23,7 @@ const flagFetchAll int32 = 0x0000000b // TODO: add messages fetching mechanism
 const flagShutdown int32 = 0x7fffffff
 
 const toAnonymous uint32 = 0x7fffffff
+const toServer uint32 = 0x7ffffffe
 
 const stateSecureConnectionEstablished uint = 1
 const stateLoggedWithCredentials uint = 2
@@ -93,8 +94,8 @@ func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
     return result
 }
 
-func shutdownRequested(connectionId uint32, user *database.User) int32 {
-    utils.Assert(user != nil)
+func shutdownRequested(connectionId uint32, user *database.User, msg *message) int32 {
+    utils.Assert(user != nil && msg.to == toServer)
     if database.IsAdmin(user) { return flagShutdown }
 
     sendMessage(connectionId, simpleServerMessage(flagError, user.Id))
@@ -182,7 +183,8 @@ func routeMessage(connectionId uint32, msg *message) int32 {
             connectionStates[connectionId] == 0 && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
             msg.from == fromAnonymous &&
             xConnectionId == nil &&
-            userId == nil,
+            userId == nil &&
+            msg.to == toServer,
         )
 
         connectionStates[connectionId] = stateSecureConnectionEstablished
@@ -202,7 +204,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
 
     switch flag {
         case flagShutdown:
-            return shutdownRequested(connectionId, connectedUsers[connectionId])
+            return shutdownRequested(connectionId, connectedUsers[connectionId], msg)
         case flagProceed:
             return proceedRequested(msg)
         case flagLogIn:
@@ -210,6 +212,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
         case flagRegister:
             return registrationWithCredentialsRequested(connectionId, msg)
         case flagFinish:
+            utils.Assert(msg.to == toServer)
             return finishRequested(connectionId)
         default:
             utils.JustThrow()
