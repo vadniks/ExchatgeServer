@@ -178,20 +178,20 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
             resultFlag := processClientMessage(connectionId, encryptionKey, messageBuffer)
             switch resultFlag {
                 case flagFinishWithError: fallthrough // --& --x-- falling through until I decide what to do with them
-                case flagFinish: fallthrough
+                case flagFinish:
+                    return
                 case flagShutdown:
                     waitGroup.Done()
-                    break
+                    (*onShutDownRequested)()
                 case flagProceed: fallthrough // --x--
                 case flagError: fallthrough
                 case flagSuccess:
             }
-            if resultFlag == flagShutdown { (*onShutDownRequested)() }
         }
 
         if disconnected {
             waitGroup.Done()
-            break
+            return
         }
     }
 }
