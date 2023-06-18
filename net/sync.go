@@ -20,8 +20,7 @@ const flagRegistered int32 = 0x00000007
 const flagSuccess int32 = 0x00000008
 const flagError int32 = 0x00000009
 const flagUnauthenticated int32 = 0x0000000a
-const flagId int32 = 0x0000000b
-const flagFetchAll int32 = 0x0000000c // TODO: add messages fetching mechanism
+const flagFetchAll int32 = 0x0000000b // TODO: add messages fetching mechanism
 const flagShutdown int32 = 0x7fffffff
 
 const toAnonymous uint32 = 0x7fffffff
