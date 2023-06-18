@@ -135,7 +135,7 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
 
     user := database.FindUser(username, unhashedPassword)
     if user == nil {
-        sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous)) // TODO: test how server handles client disconnection & vice versa
+        sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
         return flagError
     }
 
