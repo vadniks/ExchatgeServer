@@ -198,7 +198,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     }
 
     switch flag {
-        case flagShutdown:
+        case flagShutdown: // TODO: shutdown works!
             return shutdownRequested(connectionId, connectedUsers[connectionId], msg)
         case flagProceed:
             return proceedRequested(msg)
