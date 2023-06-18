@@ -5,6 +5,7 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/database"
     "ExchatgeServer/utils"
+    "fmt"
     "unsafe"
 )
 
@@ -134,8 +135,10 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
 
     user := database.FindUser(username, unhashedPassword)
     if user == nil {
+        fmt.Println("not logged in") // TODO: on a client side after connection gets closed 'cause of log in failure the onDisconnected callback doesn't get called
         sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
-        return flagError
+        finishRequested(connectionId)
+        return flagFinishWithError
     }
 
     connectedUsers[connectionId] = user
@@ -190,6 +193,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
         )
 
         if xConnectionId == nil || userId == nil || *xConnectionId != connectionId || *userId != connectedUsers[connectionId].Id {
+            fmt.Println("unauthenticated", connectionId)
             sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
             finishRequested(connectionId)
             return flagFinishWithError

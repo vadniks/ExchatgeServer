@@ -4,6 +4,7 @@ package net
 import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/utils"
+    "fmt"
     "github.com/jamesruan/sodium"
     goNet "net"
     "sync"
@@ -172,6 +173,11 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
     utils.Assert(encryptionKey != nil)
     encryptionKeys[connectionId] = encryptionKey
 
+    closeConnection := func() {
+        waitGroup.Done()
+        utils.Assert((*connection).Close() == nil)
+    }
+
     messageBuffer := make([]byte, this.messageBufferSize)
     for {
         disconnected := false
@@ -181,10 +187,13 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
             switch resultFlag {
                 case flagFinishWithError: fallthrough // --& --x-- falling through until I decide what to do with them
                 case flagFinish:
+                    fmt.Println("finish", connectionId)
+                    closeConnection()
                     return
                 case flagShutdown:
                     waitGroup.Done()
                     (*onShutDownRequested)()
+                    return
                 case flagProceed: fallthrough // --x--
                 case flagError: fallthrough
                 case flagSuccess:
@@ -192,7 +201,7 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
         }
 
         if disconnected {
-            waitGroup.Done()
+            closeConnection()
             return
         }
     }
