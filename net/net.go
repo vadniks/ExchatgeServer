@@ -232,7 +232,7 @@ func sendMessage(connectionId uint32, msg *message) {
     utils.Assert(connection != nil)
 
     packed := msg.pack()
-    encrypted := crypto.Encrypt(encryptionKey, packed)
+    encrypted := crypto.Encrypt(packed, encryptionKey)
 
     send(connection, encrypted)
 }
