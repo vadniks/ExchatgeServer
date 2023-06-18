@@ -5,6 +5,7 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/database"
     "ExchatgeServer/utils"
+    "fmt"
     "unsafe"
 )
 
@@ -137,17 +138,20 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
         passwordSize > 0 && passwordSize <= unhashedPasswordSize,
     )
 
+    fmt.Println("login a") // TODO: test only
     user := database.FindUser(username, unhashedPassword)
     if user == nil {
+        fmt.Println("login b") // TODO: test only
         sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
         return flagError
     }
+    fmt.Println("login c") // TODO: test only
 
     connectedUsers[connectionId] = user
     connectionStates[connectionId] = stateLoggedWithCredentials
 
     token := makeToken(connectionId, user.Id) // won't compile if inline the variable
-    sendMessage(connectionId, serverMessage(flagLoggedIn, toAnonymous, token[:])) // here's how a client obtains his id
+    sendMessage(connectionId, serverMessage(flagLoggedIn, user.Id, token[:])) // here's how a client obtains his id
     return flagProceed
 }
 
