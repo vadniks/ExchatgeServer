@@ -4,7 +4,6 @@ package net
 import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/utils"
-    "fmt"
     "github.com/jamesruan/sodium"
     goNet "net"
     "sync"
@@ -187,7 +186,6 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
             switch resultFlag {
                 case flagFinishWithError: fallthrough // --& --x-- falling through until I decide what to do with them
                 case flagFinish:
-                    fmt.Println("finish", connectionId)
                     closeConnection()
                     return
                 case flagShutdown:

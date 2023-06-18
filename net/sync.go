@@ -5,7 +5,6 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/database"
     "ExchatgeServer/utils"
-    "fmt"
     "unsafe"
 )
 
@@ -124,7 +123,6 @@ func parseCredentials(msg *message) (username []byte, unhashedPassword []byte) {
 
 func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 { // expects the password not to be hashed in order to compare it with salted hash (which is always different)
     utils.Assert(msg != nil)
-
     username, unhashedPassword := parseCredentials(msg)
 
     xUsernameSize := uint(len(username)); passwordSize := uint(len(unhashedPassword))
@@ -135,7 +133,6 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
 
     user := database.FindUser(username, unhashedPassword)
     if user == nil {
-        fmt.Println("not logged in") // TODO: on a client side after connection gets closed 'cause of log in failure the onDisconnected callback doesn't get called
         sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
         finishRequested(connectionId)
         return flagFinishWithError
@@ -193,7 +190,6 @@ func routeMessage(connectionId uint32, msg *message) int32 {
         )
 
         if xConnectionId == nil || userId == nil || *xConnectionId != connectionId || *userId != connectedUsers[connectionId].Id {
-            fmt.Println("unauthenticated", connectionId)
             sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
             finishRequested(connectionId)
             return flagFinishWithError
