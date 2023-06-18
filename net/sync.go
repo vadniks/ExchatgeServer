@@ -5,7 +5,6 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/database"
     "ExchatgeServer/utils"
-    "fmt"
     "unsafe"
 )
 
@@ -189,7 +188,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
             msg.from != fromAnonymous &&
             msg.from != fromServer,
         )
-        fmt.Println("@ ", xConnectionId, userId) // TODO: test only
+
         if xConnectionId == nil || userId == nil || *xConnectionId != connectionId || *userId != connectedUsers[connectionId].Id {
             sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
             finishRequested(connectionId)
@@ -198,7 +197,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     }
 
     switch flag {
-        case flagShutdown: // TODO: shutdown works!
+        case flagShutdown:
             return shutdownRequested(connectionId, connectedUsers[connectionId], msg)
         case flagProceed:
             return proceedRequested(msg)
