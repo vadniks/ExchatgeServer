@@ -18,7 +18,8 @@ const longSize = 8
 
 const messageSize uint = 1 << 10 // exactly 1 kB
 const tokenTrailingSize uint = 16
-const tokenSize = intSize * 2 + 40 + tokenTrailingSize // 48 + 16 = 64 = 2 encrypted ints + mac + nonce + missing bytes to reach signatureSize so the server can tokenize itself via signature whereas for clients server encrypts 2 ints (connectionId, userId)
+const tokenUnencryptedValueSize = 2 * intSize
+const tokenSize = tokenUnencryptedValueSize + 40 + tokenTrailingSize // 48 + 16 = 64 = 2 encrypted ints + mac + nonce + missing bytes to reach signatureSize so the server can tokenize itself via signature whereas for clients server encrypts 2 ints (connectionId, userId)
 const messageHeadSize = intSize * 6 + longSize + tokenSize // 96
 const messageBodySize = messageSize - messageHeadSize // 928
 
@@ -88,7 +89,7 @@ func unpackMessage(bytes []byte) *message {
 
 //goland:noinspection GoRedundantConversion for (*byte) as without this it won't compile
 func makeToken(connectionId uint32, userId uint32) [tokenSize]byte {
-    bytes := make([]byte, 2 * intSize)
+    bytes := make([]byte, tokenUnencryptedValueSize)
 
     copy(bytes, unsafe.Slice((*byte) (unsafe.Pointer(&connectionId)), intSize))
     copy(unsafe.Slice(&(bytes[intSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&userId)), intSize))
@@ -105,10 +106,10 @@ func makeToken(connectionId uint32, userId uint32) [tokenSize]byte {
 //goland:noinspection GoRedundantConversion for (*byte) as without this it won't compile
 func openToken(withTrailing [tokenSize]byte) (*uint32, *uint32) { // nillable results
     token := withTrailing[:tokenSize - tokenTrailingSize]
-    utils.Assert(len(token) == int(crypto.EncryptedSize(2 * intSize)))
+    utils.Assert(len(token) == int(crypto.EncryptedSize(tokenUnencryptedValueSize)))
 
     decrypted := crypto.Decrypt(token, tokenEncryptionKey)
-    if decrypted == nil || len(decrypted) != 2 * intSize { return nil, nil }
+    if decrypted == nil || len(decrypted) != tokenUnencryptedValueSize { return nil, nil }
 
     connectionId := new(uint32); userId := new(uint32)
     copy(unsafe.Slice((*byte) (unsafe.Pointer(connectionId)), intSize), decrypted)

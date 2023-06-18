@@ -39,11 +39,11 @@ var tokenServer = func() [tokenSize]byte { // letting clients to verify server's
     //goland:noinspection GoBoolExpressions - just to make sure
     utils.Assert(tokenSize == crypto.SignatureSize)
 
-    unsigned := make([]byte, 2 * intSize)
+    unsigned := make([]byte, tokenUnencryptedValueSize)
     for i, _ := range unsigned { unsigned[i] = (1 << 8) - 1 } // 255
 
     signed := crypto.Sign(unsigned)
-    utils.Assert(len(signed) - 2 * intSize == int(crypto.SignatureSize))
+    utils.Assert(len(signed) - tokenUnencryptedValueSize == int(crypto.SignatureSize))
 
     var arr [tokenSize]byte
     copy(unsafe.Slice(&(arr[0]), messageBodySize), signed[:crypto.SignatureSize]) // only signature goes into token as clients know what's the signed constant value is
