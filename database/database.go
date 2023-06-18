@@ -5,7 +5,6 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/utils"
     "context"
-    "fmt"
     "go.mongodb.org/mongo-driver/bson"
     "go.mongodb.org/mongo-driver/mongo"
     "go.mongodb.org/mongo-driver/mongo/options"
@@ -85,15 +84,12 @@ func FindUser(username []byte, unhashedPassword []byte) *User { // nillable resu
     utils.Assert(len(username) > 0 && len(unhashedPassword) > 0)
 
     result := this.collection.FindOne(*(this.ctx), bson.D{{fieldName, username}})
-    fmt.Println("fu a", result.Err(), []byte{'u', 's', 'e', 'r', '1', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
     if result.Err() != nil { return nil }
-    fmt.Println("fu b")
+
     if user := new(User); result.Decode(user) == nil {
-        fmt.Println("fu c")
         crypto.CompareWithHash(user.Password, unhashedPassword)
         return user
     } else {
-        fmt.Println("fu d")
         return nil
     }
 }
