@@ -1,0 +1,7 @@
+
+use db
+db.users.insertOne({id:6})
+db.users.countDocuments()
+db.users.find({"id":0})
+db.users.find()
+db.users.drop()

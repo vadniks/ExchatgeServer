@@ -18,9 +18,6 @@ const collectionUsers = "users"
 const collectionConversations = "conversations"
 const collectionMessages = "messages"
 
-var adminUsername = []byte("admin")
-var adminPassword = crypto.Hash([]byte("admin"))
-
 const fieldRealId = "_id"
 const fieldId = "id"
 const fieldName = "name"
@@ -31,6 +28,9 @@ type User struct {
     Name []byte `bson:"name"`
     Password []byte `bson:"password"` // salty-hashed
 }
+
+var adminUsername = []byte{'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+var adminPassword = crypto.Hash([]byte{'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
 
 func (user *User) passwordHashed() *User {
     user.Password = crypto.Hash(user.Password)
@@ -74,8 +74,8 @@ func addAdminIfNotExists() { // admin is the only user that has id equal to 0 TO
 }
 
 func mocData() { // TODO: test only
-    user1 := &User{1, []byte("user1"), crypto.Hash([]byte("user1"))}
-    user2 := &User{2, []byte("user2"), crypto.Hash([]byte("user2"))}
+    user1 := &User{1, []byte{'u', 's', 'e', 'r', '1', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, crypto.Hash([]byte{'u', 's', 'e', 'r', '1', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})}
+    user2 := &User{2, []byte{'u', 's', 'e', 'r', '2', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, crypto.Hash([]byte{'u', 's', 'e', 'r', '2', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})}
 
     _ = AddUser(user1.Name, user1.Password)
     _ = AddUser(user2.Name, user2.Password)
@@ -108,7 +108,7 @@ func availableUserId() uint32 { // TODO: maybe just use the real mongodb's _id?
     utils.Assert(err == nil)
 
     var users []User
-    utils.Assert(cursor.All(*(this.ctx), users) == nil)
+    utils.Assert(cursor.All(*(this.ctx), &users) == nil)
 
     var biggestId uint32 = 0
     for _, i := range users { if id := i.Id; id > biggestId { biggestId = id } }
@@ -119,7 +119,10 @@ func AddUser(username []byte, hashedPassword []byte) *User { // nillable result
     utils.Assert(len(username) > 0 && len(hashedPassword) == int(crypto.HashSize))
     if usernameAlreadyInUse(username) { return nil }
 
-    result, err := this.collection.InsertOne(*(this.ctx), User{Id: availableUserId(), Name: username, Password: hashedPassword})
+    userId := availableUserId()
+    utils.Assert(userId > 0)
+
+    result, err := this.collection.InsertOne(*(this.ctx), User{Id: userId, Name: username, Password: hashedPassword})
     if result == nil || err != nil { return nil }
 
     result2 := this.collection.FindOne(*(this.ctx), bson.D{{fieldRealId, result.InsertedID}})
