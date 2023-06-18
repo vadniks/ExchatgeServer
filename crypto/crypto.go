@@ -83,6 +83,11 @@ func CompareWithHash(hash []byte, unhashed []byte) bool {
 }
 
 func Sign(bytes []byte) []byte {
-    utils.Assert(len(bytes) > 0)
-    return sodium.Bytes(bytes).Sign(signSecretKey)
+    bytesSize := len(bytes)
+    utils.Assert(bytesSize > 0)
+
+    result := sodium.Bytes(bytes).Sign(signSecretKey)
+    utils.Assert(len(result) == int(SignatureSize) + bytesSize)
+
+    return result
 }
