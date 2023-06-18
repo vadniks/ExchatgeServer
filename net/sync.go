@@ -5,7 +5,6 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/database"
     "ExchatgeServer/utils"
-    "reflect"
     "unsafe"
 )
 
@@ -25,14 +24,14 @@ const flagShutdown int32 = 0x7fffffff
 
 const toAnonymous uint32 = 0x7fffffff
 
-const stateSecureConnectionEstablished = 1
-const stateLoggedWithCredentials = 2
+const stateSecureConnectionEstablished uint = 1
+const stateLoggedWithCredentials uint = 2
 
 const usernameSize uint = 16
 const unhashedPasswordSize uint = 16
 
-const fromAnonymous = 0x00000000
-const fromServer = 0x7fffffff
+const fromAnonymous uint32 = 0x00000000
+const fromServer uint32 = 0x7fffffff
 
 var tokenAnonymous = make([]byte, tokenSize) // all zeroes
 
@@ -181,7 +180,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     if flag == flagLogIn || flag == flagRegister {
         utils.Assert(
             connectionStates[connectionId] == 0 && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
-            reflect.DeepEqual(msg.from, fromAnonymous) &&
+            msg.from == fromAnonymous &&
             xConnectionId == nil &&
             userId == nil,
         )
@@ -190,8 +189,8 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     } else {
         utils.Assert(
             connectionStates[connectionId] > 0 &&
-            !reflect.DeepEqual(msg.from, fromAnonymous) &&
-            !reflect.DeepEqual(msg.from, fromServer),
+            msg.from != fromAnonymous &&
+            msg.from != fromServer,
         )
 
         if xConnectionId == nil || userId == nil || *xConnectionId != connectionId {

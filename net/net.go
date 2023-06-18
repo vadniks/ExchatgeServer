@@ -19,8 +19,8 @@ const longSize = 8
 const messageSize uint = 1 << 10 // exactly 1 kB
 const tokenTrailingSize uint = 16
 const tokenSize = intSize * 2 + 40 + tokenTrailingSize // 48 + 16 = 64 = 2 encrypted ints + mac + nonce + missing bytes to reach signatureSize so the server can tokenize itself via signature whereas for clients server encrypts 2 ints (connectionId, userId)
-const messageHeadSize = intSize * 6 + longSize + tokenSize // 92
-const messageBodySize = messageSize - messageHeadSize // 932
+const messageHeadSize = intSize * 6 + longSize + tokenSize // 96
+const messageBodySize = messageSize - messageHeadSize // 928
 
 type net struct {
     serverPublicKey []byte
