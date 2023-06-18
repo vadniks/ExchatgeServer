@@ -2,18 +2,19 @@
 package main
 
 import (
-    "ExchatgeServer/database"
-    "ExchatgeServer/net"
-    "sync"
+    "fmt"
+    "github.com/jamesruan/sodium"
 )
 
 func main() {
-    var waitGroup sync.WaitGroup
-    waitGroup.Add(1)
-    go database.Init(&waitGroup)
+    fmt.Println(sodium.SignSecretKey{Bytes: []byte{1,2,3,4,5,6,7,8}}.Sign(sodium.MakeSignKP().SecretKey)[64:])
 
-    net.Initialize()
-    net.ProcessClients()
-
-    waitGroup.Wait()
+    //var waitGroup sync.WaitGroup
+    //waitGroup.Add(1)
+    //go database.Init(&waitGroup)
+    //
+    //net.Initialize()
+    //net.ProcessClients()
+    //
+    //waitGroup.Wait()
 }
