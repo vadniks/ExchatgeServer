@@ -5,6 +5,7 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/database"
     "ExchatgeServer/utils"
+    "fmt"
     "unsafe"
 )
 
@@ -31,7 +32,7 @@ const stateLoggedWithCredentials uint = 2
 const usernameSize uint = 16
 const unhashedPasswordSize uint = 16
 
-const fromAnonymous uint32 = 0x00000000
+const fromAnonymous uint32 = 0xffffffff
 const fromServer uint32 = 0x7fffffff
 
 var tokenAnonymous = make([]byte, tokenSize) // all zeroes
@@ -93,7 +94,6 @@ func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
 func shutdownRequested(connectionId uint32, user *database.User, msg *message) int32 {
     utils.Assert(user != nil && msg.to == toServer)
     if database.IsAdmin(user) { return flagShutdown }
-
     sendMessage(connectionId, simpleServerMessage(flagError, user.Id))
     return flagProceed
 }
@@ -189,8 +189,8 @@ func routeMessage(connectionId uint32, msg *message) int32 {
             msg.from != fromAnonymous &&
             msg.from != fromServer,
         )
-
-        if xConnectionId == nil || userId == nil || *xConnectionId != connectionId {
+        fmt.Println("@ ", xConnectionId, userId) // TODO: test only
+        if xConnectionId == nil || userId == nil || *xConnectionId != connectionId || *userId != connectedUsers[connectionId].Id {
             sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
             finishRequested(connectionId)
             return flagFinishWithError

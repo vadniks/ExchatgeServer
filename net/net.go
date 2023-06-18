@@ -147,7 +147,7 @@ func ProcessClients() {
         waitGroup.Wait()
     }
 
-    var connectionId uint32 = 0
+    var connectionId uint32 = 0 // TODO: limit connections count to [0, 0x7ffffffe] as service flags are above
     for acceptingClients.Load() {
         connection, err := listener.Accept()
         if err != nil { break }
