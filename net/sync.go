@@ -32,34 +32,43 @@ const stateLoggedWithCredentials = 2
 const usernameSize uint = 16
 const unhashedPasswordSize uint = 16
 
-var connectedUsers map[uint]*database.User // key is connectionId
-var connectionStates map[uint]uint // map[connectionId]state
+const fromAnonymous = 0x00000000
+const fromServer = 0x7fffffff
 
-var fromAnonymous = make([]byte, crypto.TokenSize) // all zeroes
+var tokenAnonymous = make([]byte, tokenSize) // all zeroes
 
-var fromServer = func() [crypto.TokenSize]byte {
-   var bytes [crypto.TokenSize]byte
-   for i, _ := range bytes { bytes[i] = 0xff }
-   return bytes
-}()
+var tokenServer = func() [tokenSize]byte { // letting clients to verify server's signature
+    //goland:noinspection GoBoolExpressions - just to make sure
+    utils.Assert(tokenSize == crypto.SignatureSize)
 
-var fromServerMessageBodyStub = func() [messageBodySize]byte { // letting clients to verify server's signature
-    signed := crypto.Sign(make([]byte, messageBodySize - crypto.SignatureSize))
-    var arr [messageBodySize]byte
-    copy(unsafe.Slice(&(arr[0]), messageBodySize), signed)
+    unsigned := make([]byte, 2 * intSize)
+    for i, _ := range unsigned { unsigned[i] = (1 << 8) - 1 } // 255
+
+    signed := crypto.Sign(unsigned)
+    utils.Assert(len(signed) - 2 * intSize == int(crypto.SignatureSize))
+
+    var arr [tokenSize]byte
+    copy(unsafe.Slice(&(arr[0]), messageBodySize), signed[:crypto.SignatureSize]) // only signature goes into token as clients know what's the signed constant value is
+
     return arr
 }()
+
+var bodyStub = [messageBodySize]byte{} // all zeroes
+
+var connectedUsers map[uint32]*database.User // key is connectionId
+var connectionStates map[uint32]uint // map[connectionId]state
 
 func simpleServerMessage(xFlag int32, xTo uint32) *message {
     return &message{
         flag: xFlag,
         timestamp: utils.CurrentTimeMillis(),
-        size: messageBodySize,
+        size: 0,
         index: 0,
         count: 1,
         from: fromServer,
         to: xTo,
-        body: fromServerMessageBodyStub,
+        token: tokenServer,
+        body: bodyStub,
     }
 }
 
@@ -68,8 +77,8 @@ func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
     maxBodySize := messageBodySize - crypto.SignatureSize
     utils.Assert(bodySize > 0 && bodySize <= int(maxBodySize))
 
-    signed := crypto.Sign(xBody)
-    utils.Assert(len(signed) == messageBodySize)
+    signedBody := crypto.Sign(xBody)
+    utils.Assert(len(signedBody) == int(messageBodySize))
 
     result := &message{
         flag: xFlag,
@@ -79,14 +88,14 @@ func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
         count: 1,
         from: fromServer,
         to: xTo,
-        body: [messageBodySize]byte{},
+        token: tokenServer,
     }
 
-    copy(unsafe.Slice(&(result.body[0]), messageBodySize), signed)
+    copy(unsafe.Slice(&(result.body[0]), messageBodySize), signedBody)
     return result
 }
 
-func shutdownRequested(connectionId uint, user *database.User) int32 {
+func shutdownRequested(connectionId uint32, user *database.User) int32 {
     utils.Assert(user != nil)
     if database.IsAdmin(user) { return flagShutdown }
 
@@ -97,9 +106,6 @@ func shutdownRequested(connectionId uint, user *database.User) int32 {
 //goland:noinspection GoRedundantConversion (*byte) - just silence that annoying warning already!
 func proceedRequested(msg *message) int32 {
     utils.Assert(msg != nil)
-
-    fromId := crypto.Untokenize(msg.from[:]) // TODO: return previous (uint32-typed) 'from' field to message and add separate field for token
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(msg.from))), crypto.TokenSize), unsafe.Slice((*byte) (unsafe.Pointer(&fromId)), 4))
 
     if toUserConnectionId, toUser := findConnectUsr(msg.to); toUser != nil {
         sendMessage(toUserConnectionId, msg)
@@ -121,7 +127,7 @@ func parseCredentials(msg *message) (username []byte, unhashedPassword []byte) {
     return username, unhashedPassword
 }
 
-func loggingInWithCredentialsRequested(connectionId uint, msg *message) int32 { // expects the password not to be hashed in order to compare it with salted hash (which is always different)
+func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 { // expects the password not to be hashed in order to compare it with salted hash (which is always different)
     utils.Assert(msg != nil)
 
     username, unhashedPassword := parseCredentials(msg)
@@ -142,11 +148,12 @@ func loggingInWithCredentialsRequested(connectionId uint, msg *message) int32 { 
     connectedUsers[connectionId] = user
     connectionStates[connectionId] = stateLoggedWithCredentials
 
-    sendMessage(connectionId, serverMessage(flagLoggedIn, toAnonymous, crypto.Tokenize(user.Id))) // here's how a client obtains his id
+    token := makeToken(connectionId, user.Id) // won't compile if inline the variable
+    sendMessage(connectionId, serverMessage(flagLoggedIn, toAnonymous, token[:])) // here's how a client obtains his id
     return flagProceed
 }
 
-func registrationWithCredentialsRequested(connectionId uint, msg *message) int32 {
+func registrationWithCredentialsRequested(connectionId uint32, msg *message) int32 {
     utils.Assert(msg != nil)
 
     username, unhashedPassword := parseCredentials(msg)
@@ -161,23 +168,25 @@ func registrationWithCredentialsRequested(connectionId uint, msg *message) int32
     if successful { return flagFinishToReconnect } else { return flagError }
 }
 
-func finishRequested(connectionId uint) int32 {
+func finishRequested(connectionId uint32) int32 {
     delete(connectedUsers, connectionId)
     delete(connectionStates, connectionId)
     return flagFinish
 }
 
-func routeMessage(connectionId uint, msg *message) int32 {
+func routeMessage(connectionId uint32, msg *message) int32 {
     utils.Assert(msg != nil)
     flag := msg.flag
-    from := crypto.Untokenize(msg.from[:])
+    xConnectionId, userId := openToken(msg.token)
 
     if flag == flagLoginWithCredentials || flag == flagRegisterWithCredentials {
         utils.Assert(
             connectionStates[connectionId] == 0 && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
             reflect.DeepEqual(msg.from, fromAnonymous) &&
-            from == nil,
+            xConnectionId == nil &&
+            userId == nil,
         )
+
         connectionStates[connectionId] = stateSecureConnectionEstablished
     } else {
         utils.Assert(
@@ -186,7 +195,7 @@ func routeMessage(connectionId uint, msg *message) int32 {
             !reflect.DeepEqual(msg.from, fromServer),
         )
 
-        if from == nil {
+        if xConnectionId == nil || userId == nil || *xConnectionId != connectionId {
             sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
             finishRequested(connectionId)
             return flagFinishWithError
@@ -210,7 +219,7 @@ func routeMessage(connectionId uint, msg *message) int32 {
     return 0 // not gonna get here
 }
 
-func findConnectUsr(userId uint32) (uint, *database.User) { // nillable second result
+func findConnectUsr(userId uint32) (uint32, *database.User) { // nillable second result
     for i, j := range connectedUsers { if j.Id == userId { return i, j } }
     return 0, nil
 }
