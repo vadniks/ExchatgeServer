@@ -74,11 +74,7 @@ func simpleServerMessage(xFlag int32, xTo uint32) *message {
 
 func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
     bodySize := len(xBody)
-    maxBodySize := messageBodySize - crypto.SignatureSize
-    utils.Assert(bodySize > 0 && bodySize <= int(maxBodySize))
-
-    signedBody := crypto.Sign(xBody)
-    utils.Assert(len(signedBody) == int(messageBodySize))
+    utils.Assert(bodySize > 0 && bodySize <= int(messageBodySize))
 
     result := &message{
         flag: xFlag,
@@ -91,7 +87,7 @@ func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
         token: tokenServer,
     }
 
-    copy(unsafe.Slice(&(result.body[0]), messageBodySize), signedBody)
+    copy(unsafe.Slice(&(result.body[0]), messageBodySize), xBody)
     return result
 }
 
@@ -141,8 +137,8 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
     fmt.Println("login a") // TODO: test only
     user := database.FindUser(username, unhashedPassword)
     if user == nil {
-        fmt.Println("login b") // TODO: test only
-        sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
+        fmt.Println("login b", username) // TODO: test only
+        sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous)) // TODO: test how server handles client disconnection & vice versa
         return flagError
     }
     fmt.Println("login c") // TODO: test only

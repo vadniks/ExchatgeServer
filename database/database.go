@@ -5,11 +5,11 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/utils"
     "context"
+    "fmt"
     "go.mongodb.org/mongo-driver/bson"
     "go.mongodb.org/mongo-driver/mongo"
     "go.mongodb.org/mongo-driver/mongo/options"
     "reflect"
-    "sync"
 )
 
 const mongoUrl = "mongodb://127.0.0.1:27017/exchatge"
@@ -42,26 +42,24 @@ func (user *User) passwordHashed() *User {
 type database struct {
     ctx *context.Context
     collection *mongo.Collection
+    client *mongo.Client
 }
 var this *database = nil
 
-func Init(waitGroup *sync.WaitGroup) { // TODO: authenticate database connection with password
+func Init() { // TODO: authenticate database connection with password
     ctx := context.TODO()
 
     client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoUrl))
     utils.Assert(err == nil)
 
-    defer func() {
-        utils.Assert(client.Disconnect(ctx) == nil)
-        waitGroup.Done()
-    }()
-
     collection := client.Database(databaseName).Collection(collectionUsers)
-    this = &database{&ctx, collection}
+    this = &database{&ctx, collection, client}
 
     addAdminIfNotExists()
     mocData() // TODO: test only
 }
+
+func Destroy() { utils.Assert(this.client.Disconnect(*(this.ctx)) == nil) }
 
 func addAdminIfNotExists() { // admin is the only user that has id equal to 0 TODO: how about adding an isAdmin field?
     if result := this.collection.FindOne(
@@ -87,12 +85,15 @@ func FindUser(username []byte, unhashedPassword []byte) *User { // nillable resu
     utils.Assert(len(username) > 0 && len(unhashedPassword) > 0)
 
     result := this.collection.FindOne(*(this.ctx), bson.D{{fieldName, username}})
+    fmt.Println("fu a", result.Err(), []byte{'u', 's', 'e', 'r', '1', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
     if result.Err() != nil { return nil }
-
+    fmt.Println("fu b")
     if user := new(User); result.Decode(user) == nil {
+        fmt.Println("fu c")
         crypto.CompareWithHash(user.Password, unhashedPassword)
         return user
     } else {
+        fmt.Println("fu d")
         return nil
     }
 }
