@@ -42,7 +42,8 @@ type message struct {
     body [messageBodySize]byte // TODO: generate permanent encryption key for each conversation and store encrypted messages in a database
 }
 
-var connections = make(map[uint32]*goNet.Conn)
+var connections = make(map[uint32]*goNet.Conn) // key is connectionId
+var encryptionKeys = make(map[uint32][]byte) // key is connectionId
 
 var tokenEncryptionKey = func() []byte {
     key := new(sodium.SecretBoxKey)
@@ -169,13 +170,14 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
 
     encryptionKey := crypto.ExchangeKeys(this.serverPublicKey, this.serverSecretKey, clientPublicKey)
     utils.Assert(encryptionKey != nil)
+    encryptionKeys[connectionId] = encryptionKey
 
     messageBuffer := make([]byte, this.messageBufferSize)
     for {
         disconnected := false
 
         if receive(connection, messageBuffer, &disconnected) {
-            resultFlag := processClientMessage(connectionId, encryptionKey, messageBuffer)
+            resultFlag := processClientMessage(connectionId, messageBuffer)
             switch resultFlag {
                 case flagFinishWithError: fallthrough // --& --x-- falling through until I decide what to do with them
                 case flagFinish:
@@ -212,7 +214,8 @@ func receive(connection *goNet.Conn, buffer []byte, /*nillable*/ error *bool) bo
     return count == len(buffer)
 }
 
-func processClientMessage(connectionId uint32, encryptionKey []byte, messageBytes []byte) int32 {
+func processClientMessage(connectionId uint32, messageBytes []byte) int32 {
+    encryptionKey := encryptionKeys[connectionId]
     utils.Assert(len(encryptionKey) > 0 && len(messageBytes) > 0)
 
     decrypted := crypto.Decrypt(messageBytes, encryptionKey)
@@ -222,10 +225,14 @@ func processClientMessage(connectionId uint32, encryptionKey []byte, messageByte
 }
 
 func sendMessage(connectionId uint32, msg *message) {
-    utils.Assert(msg != nil)
+    encryptionKey := encryptionKeys[connectionId]
+    utils.Assert(msg != nil && len(encryptionKey) > 0)
 
     connection := connections[connectionId]
     utils.Assert(connection != nil)
 
-    send(connection, msg.pack())
+    packed := msg.pack()
+    encrypted := crypto.Encrypt(encryptionKey, packed)
+
+    send(connection, encrypted)
 }
