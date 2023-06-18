@@ -42,7 +42,7 @@ type message struct {
     body [messageBodySize]byte // TODO: generate permanent encryption key for each conversation and store encrypted messages in a database
 }
 
-var connections map[uint32]*goNet.Conn
+var connections = make(map[uint32]*goNet.Conn)
 
 var tokenEncryptionKey = func() []byte {
     key := new(sodium.SecretBoxKey)

@@ -54,8 +54,8 @@ var tokenServer = func() [tokenSize]byte { // letting clients to verify server's
 
 var bodyStub = [messageBodySize]byte{} // all zeroes
 
-var connectedUsers map[uint32]*database.User // key is connectionId
-var connectionStates map[uint32]uint // map[connectionId]state
+var connectedUsers = make(map[uint32]*database.User) // key is connectionId
+var connectionStates = make(map[uint32]uint) // map[connectionId]state
 
 func simpleServerMessage(xFlag int32, xTo uint32) *message {
     return &message{
