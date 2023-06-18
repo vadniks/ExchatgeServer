@@ -165,27 +165,33 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
     send(connection, this.serverPublicKey)
 
     clientPublicKey := make([]byte, crypto.KeySize)
-    receive(connection, clientPublicKey)
+    receive(connection, clientPublicKey, nil)
 
     encryptionKey := crypto.ExchangeKeys(this.serverPublicKey, this.serverSecretKey, clientPublicKey)
     utils.Assert(encryptionKey != nil)
 
     messageBuffer := make([]byte, this.messageBufferSize)
     for {
-        if receive(connection, messageBuffer) {
+        disconnected := false
+
+        if receive(connection, messageBuffer, &disconnected) {
             resultFlag := processClientMessage(connectionId, encryptionKey, messageBuffer)
             switch resultFlag {
-                case flagFinishWithError: // --& --x-- falling through until I decide what to do with them
-                case flagFinish:
+                case flagFinishWithError: fallthrough // --& --x-- falling through until I decide what to do with them
+                case flagFinish: fallthrough
                 case flagShutdown:
                     waitGroup.Done()
                     break
-                case flagProceed: // --x--
-                case flagError:
+                case flagProceed: fallthrough // --x--
+                case flagError: fallthrough
                 case flagSuccess:
-                    break
             }
             if resultFlag == flagShutdown { (*onShutDownRequested)() }
+        }
+
+        if disconnected {
+            waitGroup.Done()
+            break
         }
     }
 }
@@ -196,11 +202,12 @@ func send(connection *goNet.Conn, payload []byte) {
     utils.Assert(count == len(payload) && err == nil)
 }
 
-func receive(connection *goNet.Conn, buffer []byte) bool {
+func receive(connection *goNet.Conn, buffer []byte, /*nillable*/ error *bool) bool {
     utils.Assert(connection != nil && len(buffer) > 0)
 
     count, err := (*connection).Read(buffer)
-    utils.Assert(err == nil)
+    if error != nil { *error = err != nil }
+    if err != nil { return false }
 
     return count == len(buffer)
 }

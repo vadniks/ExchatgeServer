@@ -77,10 +77,8 @@ func mocData() { // TODO: test only
     user1 := &User{1, []byte("user1"), crypto.Hash([]byte("user1"))}
     user2 := &User{2, []byte("user2"), crypto.Hash([]byte("user2"))}
 
-    xUser1 := AddUser(user1.Name, user1.Password)
-    xUser2 := AddUser(user2.Name, user2.Password)
-
-    utils.Assert(xUser1.Id == 0 && xUser2.Id == 2)
+    _ = AddUser(user1.Name, user1.Password)
+    _ = AddUser(user2.Name, user2.Password)
 }
 
 func IsAdmin(user *User) bool { return user.Id == 0 } // as users are being verified & authenticated right after establishing a connection
