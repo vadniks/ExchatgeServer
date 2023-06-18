@@ -140,8 +140,7 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
     user := database.FindUser(username, unhashedPassword)
     if user == nil {
         sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
-        finishRequested(connectionId)
-        return flagFinishWithError
+        return flagError
     }
 
     connectedUsers[connectionId] = user
@@ -164,7 +163,7 @@ func registrationWithCredentialsRequested(connectionId uint32, msg *message) int
         func() uint32 { if successful { return user.Id } else { return toAnonymous } }(),
     ))
 
-    if successful { return flagFinishToReconnect } else { return flagError }
+    if successful { return flagSuccess } else { return flagError }
 }
 
 func finishRequested(connectionId uint32) int32 {
