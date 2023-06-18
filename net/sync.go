@@ -13,9 +13,9 @@ const flagProceed int32 = 0x00000000
 const flagFinish int32 = 0x00000001
 const flagFinishWithError int32 = 0x00000002
 const flagFinishToReconnect int32 = 0x00000003 // after registration connection closes and client should reconnect & login
-const flagLoginWithCredentials int32 = 0x00000004
+const flagLogIn int32 = 0x00000004
 const flagLoggedIn int32 = 0x00000005
-const flagRegisterWithCredentials int32 = 0x00000006
+const flagRegister int32 = 0x00000006
 const flagRegistered int32 = 0x00000007
 const flagSuccess int32 = 0x00000008
 const flagError int32 = 0x00000009
@@ -116,7 +116,7 @@ func proceedRequested(msg *message) int32 {
 }
 
 func parseCredentials(msg *message) (username []byte, unhashedPassword []byte) { // TODO: add token protection or encrypt/sign user id
-    utils.Assert(msg != nil && (msg.flag == flagLoginWithCredentials || msg.flag == flagRegisterWithCredentials))
+    utils.Assert(msg != nil && (msg.flag == flagLogIn || msg.flag == flagRegister))
 
     username = make([]byte, usernameSize)
     copy(username, unsafe.Slice(&(msg.body[0]), usernameSize))
@@ -179,7 +179,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     flag := msg.flag
     xConnectionId, userId := openToken(msg.token)
 
-    if flag == flagLoginWithCredentials || flag == flagRegisterWithCredentials {
+    if flag == flagLogIn || flag == flagRegister {
         utils.Assert(
             connectionStates[connectionId] == 0 && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
             reflect.DeepEqual(msg.from, fromAnonymous) &&
@@ -207,9 +207,9 @@ func routeMessage(connectionId uint32, msg *message) int32 {
             return shutdownRequested(connectionId, connectedUsers[connectionId])
         case flagProceed:
             return proceedRequested(msg)
-        case flagLoginWithCredentials:
+        case flagLogIn:
             return loggingInWithCredentialsRequested(connectionId, msg)
-        case flagRegisterWithCredentials:
+        case flagRegister:
             return registrationWithCredentialsRequested(connectionId, msg)
         case flagFinish:
             return finishRequested(connectionId)
