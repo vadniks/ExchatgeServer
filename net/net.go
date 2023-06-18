@@ -191,7 +191,7 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
                     closeConnection()
                     return
                 case flagShutdown:
-                    waitGroup.Done()
+                    closeConnection()
                     (*onShutDownRequested)()
                     return
                 case flagProceed: fallthrough // --x--
