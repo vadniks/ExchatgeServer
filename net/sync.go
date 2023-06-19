@@ -19,7 +19,8 @@ const flagRegistered int32 = 0x00000007
 const flagSuccess int32 = 0x00000008
 const flagError int32 = 0x00000009
 const flagUnauthenticated int32 = 0x0000000a
-const flagFetchAll int32 = 0x0000000b // TODO: add messages fetching mechanism
+const flagAccessDenied int32 = 0x0000000b
+const flagFetchAll int32 = 0x0000000c // TODO: add messages fetching mechanism
 const flagShutdown int32 = 0x7fffffff
 
 const toAnonymous uint32 = 0x7fffffff
@@ -93,7 +94,7 @@ func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
 func shutdownRequested(connectionId uint32, user *database.User, msg *message) int32 {
     utils.Assert(user != nil && msg.to == toServer)
     if database.IsAdmin(user) { return flagShutdown }
-    sendMessage(connectionId, simpleServerMessage(flagError, user.Id))
+    sendMessage(connectionId, simpleServerMessage(flagAccessDenied, user.Id))
     return flagProceed
 }
 
