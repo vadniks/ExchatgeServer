@@ -186,8 +186,7 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
         disconnected := false
 
         if receive(connection, messageBuffer, &disconnected) {
-            resultFlag := processClientMessage(connectionId, messageBuffer)
-            switch resultFlag {
+            switch processClientMessage(connectionId, messageBuffer) {
                 case flagFinishWithError: fallthrough // --& --x-- falling through until I decide what to do with them
                 case flagFinish:
                     closeConnection()
