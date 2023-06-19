@@ -187,7 +187,8 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
 
         if receive(connection, messageBuffer, &disconnected) {
             switch processClientMessage(connectionId, messageBuffer) {
-                case flagFinishWithError: fallthrough // --& --x-- falling through until I decide what to do with them
+                case flagFinishToReconnect: fallthrough // --& --x-- falling through until I decide what to do with them
+                case flagFinishWithError: fallthrough
                 case flagFinish:
                     closeConnection()
                     return
@@ -197,7 +198,7 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
                     return
                 case flagProceed: fallthrough // --x--
                 case flagError: fallthrough
-                case flagSuccess:
+                case flagSuccess: func(){}()
             }
         }
 

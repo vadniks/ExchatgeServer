@@ -158,7 +158,7 @@ func registrationWithCredentialsRequested(connectionId uint32, msg *message) int
         func() uint32 { if successful { return user.Id } else { return toAnonymous } }(),
     ))
 
-    if successful { return flagSuccess } else { return flagError }
+    if successful { return flagFinishToReconnect } else { return flagFinishWithError }
 }
 
 func finishRequested(connectionId uint32) int32 {
