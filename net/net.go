@@ -163,19 +163,23 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
     utils.Assert(waitGroup != nil && onShutDownRequested != nil)
     connection := connections[connectionId]
 
+    closeConnection := func() {
+        delete(connections, connectionId)
+        waitGroup.Done()
+        utils.Assert((*connection).Close() == nil)
+    }
+
     send(connection, crypto.Sign(this.serverPublicKey))
 
     clientPublicKey := make([]byte, crypto.KeySize)
     receive(connection, clientPublicKey, nil)
 
     encryptionKey := crypto.ExchangeKeys(this.serverPublicKey, this.serverSecretKey, clientPublicKey)
-    utils.Assert(encryptionKey != nil)
-    encryptionKeys[connectionId] = encryptionKey
-
-    closeConnection := func() {
-        waitGroup.Done()
-        utils.Assert((*connection).Close() == nil)
+    if encryptionKey == nil {
+        closeConnection()
+        return
     }
+    encryptionKeys[connectionId] = encryptionKey
 
     messageBuffer := make([]byte, this.messageBufferSize)
     for {
