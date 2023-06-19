@@ -163,7 +163,7 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
     utils.Assert(waitGroup != nil && onShutDownRequested != nil)
     connection := connections[connectionId]
 
-    send(connection, this.serverPublicKey)
+    send(connection, crypto.Sign(this.serverPublicKey))
 
     clientPublicKey := make([]byte, crypto.KeySize)
     receive(connection, clientPublicKey, nil)
