@@ -185,7 +185,7 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
     for {
         disconnected := false
 
-        if receive(connection, messageBuffer, &disconnected) { // TODO: add timeout for an opened connection
+        if receive(connection, messageBuffer, &disconnected) { // TODO: add timeout for an opened connection and limit connection count
             switch processClientMessage(connectionId, messageBuffer) {
                 case flagFinishToReconnect: fallthrough // --& --x-- falling through until I decide what to do with them
                 case flagFinishWithError: fallthrough

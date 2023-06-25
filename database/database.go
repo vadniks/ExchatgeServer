@@ -87,8 +87,7 @@ func FindUser(username []byte, unhashedPassword []byte) *User { // nillable resu
     if result.Err() != nil { return nil }
 
     if user := new(User); result.Decode(user) == nil {
-        crypto.CompareWithHash(user.Password, unhashedPassword)
-        return user
+        if crypto.CompareWithHash(user.Password, unhashedPassword) { return user } else { return nil }
     } else {
         return nil
     }
