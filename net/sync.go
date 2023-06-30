@@ -194,9 +194,12 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
     }
     utils.Assert(counter > 0 && counter <= uint32(maxUsersCount) && counter * uint32(userInfoSize) <= uint32(messageBodySize - intSize))
 
-    bytes := make([]byte, intSize)
+    userInfoBytesSize := len(userInfosBytes)
+    utils.Assert(userInfoBytesSize <= int(messageBodySize))
+    bytes := make([]byte, intSize + userInfoBytesSize)
+
     copy(bytes, unsafe.Slice((*byte) (unsafe.Pointer(&counter)), intSize))
-    copy(unsafe.Slice(&(bytes[intSize]), len(userInfosBytes)), userInfosBytes)
+    copy(unsafe.Slice(&(bytes[intSize]), userInfoBytesSize), userInfosBytes)
 
     sendMessage(connectionId, serverMessage(flagFetchUsers, userId, bytes))
     return flagProceed
