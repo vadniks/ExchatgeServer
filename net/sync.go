@@ -178,6 +178,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
     registeredUsers := database.GetAllUsers()
     var userInfosBytes []byte
 
+    var counter uint32 = 0
     for _, user := range registeredUsers {
         _, xUser := findConnectUsr(user.Id)
 
@@ -186,12 +187,18 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
             connected: xUser != nil,
             name: [16]byte{},
         }
-        copy(unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.name))), usernameSize), unsafe.Slice(&(user.Name[0]), usernameSize))
+        copy(unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.name))), usernameSize), user.Name)
 
         userInfosBytes = append(userInfosBytes, xUserInfo.pack()...)
+        counter++
     }
+    utils.Assert(counter > 0 && counter <= uint32(maxUsersCount) && counter * uint32(userInfoSize) <= uint32(messageBodySize - intSize))
 
-    sendMessage(connectionId, serverMessage(flagFetchUsers, userId, userInfosBytes))
+    bytes := make([]byte, intSize)
+    copy(bytes, unsafe.Slice((*byte) (unsafe.Pointer(&counter)), intSize))
+    copy(bytes, userInfosBytes)
+
+    sendMessage(connectionId, serverMessage(flagFetchUsers, userId, bytes))
     return flagProceed
 }
 

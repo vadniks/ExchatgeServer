@@ -50,7 +50,7 @@ type userInfo struct {
 
 const userInfoSize = intSize + 1/*sizeof(bool)*/ + usernameSize // 21
 
-const maxUsersCount = messageBodySize / userInfoSize // 44
+const maxUsersCount = messageBodySize / (userInfoSize + 4/*uint32*/) // 44
 
 var connections = make(map[uint32]*goNet.Conn) // key is connectionId
 var encryptionKeys = make(map[uint32][]byte) // key is connectionId
