@@ -254,6 +254,8 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     return 0 // not gonna get here
 }
 
+func onConnectionClosed(connectionId uint32) { finishRequested(connectionId) }
+
 func findConnectUsr(userId uint32) (uint32, *database.User) { // nillable second result
     for i, j := range connectedUsers { if j.Id == userId { return i, j } }
     return 0, nil
