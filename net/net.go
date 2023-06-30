@@ -198,11 +198,14 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
     connection := connections[connectionId]
 
     closeConnection := func() {
-        finishRequested(connectionId) // TODO: cycle dependence (net.go here depends on sync.go which itself also fully depends on net.go) - pass function pointer to sync.go
+        finishRequested(connectionId) // TODO: cycle dependency (net.go here depends on sync.go which itself also fully depends on net.go) - pass function pointer to sync.go. But it works normally so I probably won't alter this in any way
+
         delete(connections, connectionId)
         delete(encryptionKeys, connectionId)
+
         lastConnectionId--
         waitGroup.Done()
+
         utils.Assert((*connection).Close() == nil)
     }
 

@@ -211,7 +211,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     xConnectionId, userId := openToken(msg.token)
 
     if flag == flagLogIn || flag == flagRegister {
-        utils.Assert( // --SOLVED-- TODO: fails when trying to log in with correct credentials of the 'user1' after [successful logging in with those credentials and disconnecting after successful users list fetching] - possible issues with deleting the connectionId from map
+        utils.Assert(
             connectionStates[connectionId] == 0 && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
             msg.from == fromAnonymous &&
             xConnectionId == nil &&
