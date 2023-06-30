@@ -100,14 +100,8 @@ func usernameAlreadyInUse(username []byte) bool { // username must be unique
 }
 
 func availableUserId() uint32 { // TODO: maybe just use the real mongodb's _id?
-    cursor, err := this.collection.Find(*(this.ctx), bson.D{})
-    utils.Assert(err == nil)
-
-    var users []User
-    utils.Assert(cursor.All(*(this.ctx), &users) == nil)
-
     var biggestId uint32 = 0
-    for _, i := range users { if id := i.Id; id > biggestId { biggestId = id } }
+    for _, i := range GetAllUsers() { if id := i.Id; id > biggestId { biggestId = id } }
     return biggestId + 1
 }
 
@@ -128,4 +122,13 @@ func AddUser(username []byte, hashedPassword []byte) *User { // nillable result
     utils.Assert(result2.Decode(user) == nil)
     utils.Assert(user.Id > 0 && reflect.DeepEqual(username, user.Name) && reflect.DeepEqual(hashedPassword, user.Password))
     return user
+}
+
+func GetAllUsers() []User {
+    cursor, err := this.collection.Find(*(this.ctx), bson.D{})
+    utils.Assert(err == nil)
+
+    var users []User
+    utils.Assert(cursor.All(*(this.ctx), &users) == nil && len(users) > 0)
+    return users
 }

@@ -20,7 +20,7 @@ const flagSuccess int32 = 0x00000008
 const flagError int32 = 0x00000009
 const flagUnauthenticated int32 = 0x0000000a
 const flagAccessDenied int32 = 0x0000000b
-const flagFetchAll int32 = 0x0000000c // TODO: add messages fetching mechanism
+const flagFetchUsers int32 = 0x0000000c
 const flagShutdown int32 = 0x7fffffff
 
 const toAnonymous uint32 = 0x7fffffff
@@ -150,6 +150,11 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
 func registrationWithCredentialsRequested(connectionId uint32, msg *message) int32 {
     utils.Assert(msg != nil)
 
+    if len(database.GetAllUsers()) >= int(maxUsersCount) {
+        sendMessage(connectionId, simpleServerMessage(flagError, toAnonymous))
+        return flagFinishWithError
+    }
+
     username, unhashedPassword := parseCredentials(msg)
     user := database.AddUser(username, crypto.Hash(unhashedPassword))
     successful := user != nil
@@ -166,6 +171,28 @@ func finishRequested(connectionId uint32) int32 {
     delete(connectedUsers, connectionId)
     delete(connectionStates, connectionId)
     return flagFinish
+}
+
+//goland:noinspection GoRedundantConversion
+func usersListRequested(connectionId uint32, userId uint32) int32 {
+    registeredUsers := database.GetAllUsers()
+    var userInfosBytes []byte
+
+    for _, user := range registeredUsers {
+        _, xUser := findConnectUsr(user.Id)
+
+        xUserInfo := &userInfo{
+            id: user.Id,
+            connected: xUser != nil,
+            name: [16]byte{},
+        }
+        copy(unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.name))), usernameSize), unsafe.Slice(&(user.Name[0]), usernameSize))
+
+        userInfosBytes = append(userInfosBytes, xUserInfo.pack()...)
+    }
+
+    sendMessage(connectionId, serverMessage(flagFetchUsers, userId, userInfosBytes))
+    return flagProceed
 }
 
 func routeMessage(connectionId uint32, msg *message) int32 {
@@ -209,6 +236,8 @@ func routeMessage(connectionId uint32, msg *message) int32 {
         case flagFinish:
             utils.Assert(msg.to == toServer)
             return finishRequested(connectionId)
+        case flagFetchUsers:
+            return usersListRequested(connectionId, *userId)
         default:
             utils.JustThrow()
     }

@@ -42,8 +42,19 @@ type message struct {
     body [messageBodySize]byte // TODO: generate permanent encryption key for each conversation and store encrypted messages in a database
 }
 
+type userInfo struct {
+    id uint32
+    connected bool
+    name [usernameSize]byte
+}
+
+const userInfoSize = intSize + 1/*sizeof(bool)*/ + usernameSize // 21
+
+const maxUsersCount = messageBodySize / userInfoSize // 44
+
 var connections = make(map[uint32]*goNet.Conn) // key is connectionId
 var encryptionKeys = make(map[uint32][]byte) // key is connectionId
+var lastConnectionId uint32 = 0
 
 var tokenEncryptionKey = func() []byte {
     key := new(sodium.SecretBoxKey)
@@ -86,6 +97,28 @@ func unpackMessage(bytes []byte) *message {
 
     copy(unsafe.Slice(&(message.body[0]), messageBodySize), unsafe.Slice(&(bytes[messageHeadSize]), messageBodySize))
     return message
+}
+
+func (xUserInfo *userInfo) pack() []byte {
+    utils.Assert(unsafe.Sizeof(false) == 1)
+    bytes := make([]byte, userInfoSize)
+
+    copy(unsafe.Slice(&(bytes[0]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.id))), intSize))
+    copy(unsafe.Slice(&(bytes[intSize]), 1), unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.connected))), 1))
+    copy(unsafe.Slice(&(bytes[intSize + 1]), usernameSize), unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.name))), usernameSize))
+
+    return bytes
+}
+
+func unpackUserInfo(bytes []byte) *userInfo {
+    utils.Assert(unsafe.Sizeof(false) == 1 && len(bytes) > 0)
+    xUserInfo := new(userInfo)
+
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.id))), intSize), unsafe.Slice(&(bytes[0]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.connected))), 1), unsafe.Slice(&(bytes[intSize]), 1))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.name))), usernameSize), unsafe.Slice(&(bytes[intSize + 1]), usernameSize))
+
+    return xUserInfo
 }
 
 //goland:noinspection GoRedundantConversion for (*byte) as without this it won't compile
@@ -147,15 +180,16 @@ func ProcessClients() {
         waitGroup.Wait()
     }
 
-    var connectionId uint32 = 0 // TODO: limit connections count to [0, 0x7ffffffe] as service flags are above
     for acceptingClients.Load() {
+        if lastConnectionId >= uint32(maxUsersCount) { break }
+
         connection, err := listener.Accept()
         if err != nil { break }
 
         waitGroup.Add(1)
-        connections[connectionId] = &connection
-        go processClient(connectionId, &waitGroup, &onShutDownRequested)
-        connectionId++
+        connections[lastConnectionId] = &connection
+        go processClient(lastConnectionId, &waitGroup, &onShutDownRequested)
+        lastConnectionId++
     }
 }
 
@@ -165,6 +199,8 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
 
     closeConnection := func() {
         delete(connections, connectionId)
+        delete(encryptionKeys, connectionId)
+        lastConnectionId--
         waitGroup.Done()
         utils.Assert((*connection).Close() == nil)
     }
