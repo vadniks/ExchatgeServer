@@ -196,7 +196,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
 
     bytes := make([]byte, intSize)
     copy(bytes, unsafe.Slice((*byte) (unsafe.Pointer(&counter)), intSize))
-    copy(bytes, userInfosBytes)
+    copy(unsafe.Slice(&(bytes[intSize]), len(userInfosBytes)), userInfosBytes)
 
     sendMessage(connectionId, serverMessage(flagFetchUsers, userId, bytes))
     return flagProceed
