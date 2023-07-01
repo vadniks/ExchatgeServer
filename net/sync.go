@@ -192,8 +192,8 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
             Password: make([]byte, unhashedPasswordSize),
         }
     }
-
     //registeredUsers := database.GetAllUsers()
+
     var userInfosBytes []byte
 
     infosPerMessage := uint32(messageBodySize / userInfoSize)
@@ -226,12 +226,19 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
 
     var messages []message // TODO: test only
 
+    var infosCountInMessage uint32
     for messageIndex := uint32(0); messageIndex < messagesCount; messageIndex++ {
+
+        if infosCount > infosPerMessage * (messageIndex + 1) {
+            infosCountInMessage = infosPerMessage
+        } else {
+            infosCountInMessage = infosCount - infosPerMessage * messageIndex
+        }
 
         msg := &message{
             flag: flagFetchUsers,
             timestamp: utils.CurrentTimeMillis(),
-            size: infosCount - (messageIndex + 1) * infosPerMessage, // TODO: wrong size
+            size: infosCountInMessage,
             index: messageIndex,
             count: messagesCount,
             from: fromServer,
