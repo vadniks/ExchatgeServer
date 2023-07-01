@@ -245,7 +245,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     xConnectionId, userId := openToken(msg.token)
 
     if flag == flagLogIn || flag == flagRegister {
-        utils.Assert(
+        utils.Assert( // TODO: it fails again!
             connectionStates[connectionId] == 0 && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
             msg.from == fromAnonymous &&
             xConnectionId == nil &&
