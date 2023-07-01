@@ -151,6 +151,7 @@ func registrationWithCredentialsRequested(connectionId uint32, msg *message) int
 
     if len(database.GetAllUsers()) >= maxUsersCount {
         sendMessage(connectionId, simpleServerMessage(flagError, toAnonymous))
+        finishRequested(connectionId)
         return flagFinishWithError
     }
 
@@ -163,6 +164,7 @@ func registrationWithCredentialsRequested(connectionId uint32, msg *message) int
         func() uint32 { if successful { return user.Id } else { return toAnonymous } }(),
     ))
 
+    finishRequested(connectionId)
     if successful { return flagFinishToReconnect } else { return flagFinishWithError }
 }
 
