@@ -181,8 +181,11 @@ func ProcessClients() {
 func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *sync.WaitGroup, onShutDownRequested *func()) {
     utils.Assert(waitGroup != nil && onShutDownRequested != nil)
 
-    closeConnection := func() {
-        if getConnectedUser(connectionId) != nil { onConnectionClosed(connectionId) }
+    closeConnection := func(clientDisconnected bool/*true if the connection was closed by the client*/) {
+        if clientDisconnected {
+            utils.Assert(getConnectedUser(connectionId) != nil)
+            onConnectionClosed(connectionId)
+        }
 
         lastConnectionId--
         waitGroup.Done()
@@ -197,7 +200,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *sync.
 
     encryptionKey := crypto.ExchangeKeys(this.serverPublicKey, this.serverSecretKey, clientPublicKey)
     if encryptionKey == nil {
-        closeConnection()
+        closeConnection(false)
         return
     }
     addNewConnection(connectionId, connection, encryptionKey)
@@ -211,10 +214,10 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *sync.
                 case flagFinishToReconnect: fallthrough // --& --x-- falling through until I decide what to do with them
                 case flagFinishWithError: fallthrough
                 case flagFinish:
-                    closeConnection()
+                    closeConnection(false)
                     return
                 case flagShutdown:
-                    closeConnection()
+                    closeConnection(false)
                     (*onShutDownRequested)()
                     return
                 case flagProceed: fallthrough // --x--
@@ -224,7 +227,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *sync.
         }
 
         if disconnected {
-            closeConnection()
+            closeConnection(true)
             return
         }
     }
