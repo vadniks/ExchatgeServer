@@ -5,6 +5,9 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/database"
     "ExchatgeServer/utils"
+    "fmt"
+    "math"
+    "strconv"
     "unsafe"
 )
 
@@ -100,7 +103,7 @@ func shutdownRequested(connectionId uint32, user *database.User, msg *message) i
 
 //goland:noinspection GoRedundantConversion (*byte) - just silence that annoying warning already!
 func proceedRequested(msg *message) int32 {
-    utils.Assert(msg != nil)
+    utils.Assert(msg != nil && msg.to != msg.from)
 
     if toUserConnectionId, toUser := findConnectUsr(msg.to); toUser != nil {
         sendMessage(toUserConnectionId, msg)
@@ -175,10 +178,25 @@ func finishRequested(connectionId uint32) int32 {
 
 //goland:noinspection GoRedundantConversion
 func usersListRequested(connectionId uint32, userId uint32) int32 {
-    registeredUsers := database.GetAllUsers()
+    // TODO: test only
+    registeredUsers := make([]database.User, maxUsersCount)
+    for i, _ := range registeredUsers {
+
+        name := make([]byte, usernameSize)
+        indexString := strconv.Itoa(i)
+        for i, _ := range indexString { name[i] = indexString[i] }
+
+        registeredUsers[i] = database.User{
+            Id: uint32(i),
+            Name: name,
+            Password: make([]byte, unhashedPasswordSize),
+        }
+    }
+
+    //registeredUsers := database.GetAllUsers()
     var userInfosBytes []byte
 
-    var counter uint32 = 0
+    var infosCount uint32 = 0
     for _, user := range registeredUsers {
         _, xUser := findConnectUsr(user.Id)
 
@@ -190,18 +208,47 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
         copy(unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.name))), usernameSize), user.Name)
 
         userInfosBytes = append(userInfosBytes, xUserInfo.pack()...)
-        counter++
+        infosCount++
     }
-    utils.Assert(counter > 0 && counter <= uint32(maxUsersCount) && counter * uint32(userInfoSize) <= uint32(messageBodySize - intSize))
 
-    userInfoBytesSize := len(userInfosBytes)
-    utils.Assert(userInfoBytesSize <= int(messageBodySize))
-    bytes := make([]byte, intSize + userInfoBytesSize)
+    infosPerMessage := uint32(messageBodySize / userInfoSize)
+    utils.Assert(infosPerMessage <= uint32(messageBodySize))
 
-    copy(bytes, unsafe.Slice((*byte) (unsafe.Pointer(&counter)), intSize))
-    copy(unsafe.Slice(&(bytes[intSize]), userInfoBytesSize), userInfosBytes)
+    infosBytesSize := uint32(len(userInfosBytes))
+    messagesCount := uint32(math.Ceil(float64(infosCount) / float64(infosPerMessage)))
 
-    sendMessage(connectionId, serverMessage(flagFetchUsers, userId, bytes))
+    grownInfosBytes := make([]byte, messagesCount * uint32(messageBodySize))
+    copy(grownInfosBytes, userInfosBytes)
+
+    var payloadSize uint32
+    for infoIndex := uint32(0); infoIndex < messagesCount; infoIndex++ {
+        if infosBytesSize > uint32(messageBodySize) * (infoIndex + 1) {
+            payloadSize = uint32(messageBodySize)
+        } else {
+            payloadSize = infosBytesSize - uint32(messageBodySize) * infoIndex
+        }
+
+        msg := &message{
+            flag: flagFetchUsers,
+            timestamp: utils.CurrentTimeMillis(),
+            size: payloadSize,
+            index: infoIndex,
+            count: messagesCount,
+            from: fromServer,
+            to: userId,
+            token: tokenServer,
+            body: [messageBodySize]byte{},
+        }
+
+        copy(
+           unsafe.Slice((*byte) (unsafe.Pointer(&(msg.body))), messageBodySize),
+           unsafe.Slice((*byte) (unsafe.Pointer(&(grownInfosBytes[infoIndex * uint32(messageBodySize)]))), messageBodySize),
+        )
+
+        //sendMessage(connectionId, msg)
+        fmt.Println("\n\nulr", msg.size, msg.index, msg.count, msg.body) // TODO: test only
+    }
+
     return flagProceed
 }
 

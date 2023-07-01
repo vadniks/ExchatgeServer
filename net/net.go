@@ -38,7 +38,7 @@ type message struct {
     count uint32
     from uint32
     to uint32
-    token [tokenSize]byte // TODO: generate server token for each connection
+    token [tokenSize]byte
     body [messageBodySize]byte // TODO: generate permanent encryption key for each conversation and store encrypted messages in a database
 }
 
@@ -50,7 +50,7 @@ type userInfo struct {
 
 const userInfoSize = intSize + 1/*sizeof(bool)*/ + usernameSize // 21
 
-const maxUsersCount = messageBodySize / (userInfoSize + 4/*uint32*/) // 44
+const maxUsersCount = 100
 
 var connections = make(map[uint32]*goNet.Conn) // key is connectionId
 var encryptionKeys = make(map[uint32][]byte) // key is connectionId
