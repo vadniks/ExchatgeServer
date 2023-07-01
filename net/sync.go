@@ -5,9 +5,7 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/database"
     "ExchatgeServer/utils"
-    "fmt"
     "math"
-    "strconv"
     "unsafe"
 )
 
@@ -178,22 +176,7 @@ func finishRequested(connectionId uint32) int32 {
 
 //goland:noinspection GoRedundantConversion
 func usersListRequested(connectionId uint32, userId uint32) int32 {
-    // TODO: test only
-    registeredUsers := make([]database.User, maxUsersCount)
-    for i, _ := range registeredUsers {
-
-        name := make([]byte, usernameSize)
-        indexString := strconv.Itoa(i)
-        for i, _ := range indexString { name[i] = indexString[i] }
-
-        registeredUsers[i] = database.User{
-            Id: uint32(i),
-            Name: name,
-            Password: make([]byte, unhashedPasswordSize),
-        }
-    }
-    //registeredUsers := database.GetAllUsers()
-
+    registeredUsers := database.GetAllUsers()
     var userInfosBytes []byte
 
     infosPerMessage := uint32(messageBodySize / userInfoSize)
@@ -224,8 +207,6 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
     userInfosBytes = append(userInfosBytes, make([]byte, totalPayloadBytesSize - uint32(len(userInfosBytes)))...)
     utils.Assert(uint32(len(userInfosBytes)) == totalPayloadBytesSize)
 
-    var messages []message // TODO: test only
-
     var infosCountInMessage uint32
     for messageIndex := uint32(0); messageIndex < messagesCount; messageIndex++ {
 
@@ -252,19 +233,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
            unsafe.Slice((*byte) (unsafe.Pointer(&(userInfosBytes[messageIndex * uint32(messageBodySize)]))), messageBodySize),
         )
 
-        //sendMessage(connectionId, msg)
-        fmt.Println("\n\nulr", msg.size, msg.index, msg.count, msg.body) // TODO: test only
-        messages = append(messages, *msg)
-    }
-
-    // TODO: test only
-    for _, msg := range messages {
-        for i := uint32(0); i < msg.size; i++ {
-            offset := i * uint32(userInfoSize)
-            fmt.Println(offset, offset + uint32(userInfoSize))
-            info := unpackUserInfo(msg.body[offset:offset + uint32(userInfoSize)])
-            fmt.Println(info.id, info.connected, string(info.name[:]))
-        }
+        sendMessage(connectionId, msg)
     }
 
     return flagProceed
