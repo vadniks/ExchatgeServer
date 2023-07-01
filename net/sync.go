@@ -258,9 +258,14 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
     }
 
     // TODO: test only
-    //for _, msg := range messages {
-    //    xInfosCount = msg.size
-    //}
+    for _, msg := range messages {
+        for i := uint32(0); i < msg.size; i++ {
+            offset := i * uint32(userInfoSize)
+            fmt.Println(offset, offset + uint32(userInfoSize))
+            info := unpackUserInfo(msg.body[offset:offset + uint32(userInfoSize)])
+            fmt.Println(info.id, info.connected, string(info.name[:]))
+        }
+    }
 
     return flagProceed
 }
