@@ -110,17 +110,6 @@ func (xUserInfo *userInfo) pack() []byte {
     return bytes
 }
 
-func unpackUserInfo(bytes []byte) *userInfo {
-    utils.Assert(unsafe.Sizeof(false) == 1 && len(bytes) > 0)
-    xUserInfo := new(userInfo)
-
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.id))), intSize), unsafe.Slice(&(bytes[0]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.connected))), 1), unsafe.Slice(&(bytes[intSize]), 1))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.name))), usernameSize), unsafe.Slice(&(bytes[intSize + 1]), usernameSize))
-
-    return xUserInfo
-}
-
 //goland:noinspection GoRedundantConversion for (*byte) as without this it won't compile
 func makeToken(connectionId uint32, userId uint32) [tokenSize]byte {
     bytes := make([]byte, tokenUnencryptedValueSize)
