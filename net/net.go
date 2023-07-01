@@ -189,7 +189,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *sync.
             utils.Assert(getConnectedUser(connectionId) == nil)
         }
 
-        lastConnectionId--
+        lastConnectionId-- // TODO: smth wrong with connectionIds - need to improve id issuing mechanism
         waitGroup.Done()
 
         utils.Assert((*connection).Close() == nil)
