@@ -196,6 +196,10 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
     //registeredUsers := database.GetAllUsers()
     var userInfosBytes []byte
 
+    infosPerMessage := uint32(messageBodySize / userInfoSize)
+    utils.Assert(infosPerMessage <= uint32(messageBodySize))
+    stubBytes := make([]byte, uint32(messageBodySize) - infosPerMessage * uint32(userInfoSize))
+
     var infosCount uint32 = 0
     for _, user := range registeredUsers {
         _, xUser := findConnectUsr(user.Id)
@@ -209,30 +213,26 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
 
         userInfosBytes = append(userInfosBytes, xUserInfo.pack()...)
         infosCount++
+
+        if infosCount % infosPerMessage == 0 {
+            userInfosBytes = append(userInfosBytes, stubBytes...)
+        }
     }
 
-    infosPerMessage := uint32(messageBodySize / userInfoSize)
-    utils.Assert(infosPerMessage <= uint32(messageBodySize))
-
-    infosBytesSize := uint32(len(userInfosBytes))
     messagesCount := uint32(math.Ceil(float64(infosCount) / float64(infosPerMessage)))
+    totalPayloadBytesSize := messagesCount * uint32(messageBodySize)
+    userInfosBytes = append(userInfosBytes, make([]byte, totalPayloadBytesSize - uint32(len(userInfosBytes)))...)
+    utils.Assert(uint32(len(userInfosBytes)) == totalPayloadBytesSize)
 
-    grownInfosBytes := make([]byte, messagesCount * uint32(messageBodySize))
-    copy(grownInfosBytes, userInfosBytes)
+    var messages []message // TODO: test only
 
-    var payloadSize uint32
-    for infoIndex := uint32(0); infoIndex < messagesCount; infoIndex++ {
-        if infosBytesSize > uint32(messageBodySize) * (infoIndex + 1) {
-            payloadSize = uint32(messageBodySize)
-        } else {
-            payloadSize = infosBytesSize - uint32(messageBodySize) * infoIndex
-        }
+    for messageIndex := uint32(0); messageIndex < messagesCount; messageIndex++ {
 
         msg := &message{
             flag: flagFetchUsers,
             timestamp: utils.CurrentTimeMillis(),
-            size: payloadSize,
-            index: infoIndex,
+            size: infosCount - (messageIndex + 1) * infosPerMessage, // TODO: wrong size
+            index: messageIndex,
             count: messagesCount,
             from: fromServer,
             to: userId,
@@ -242,12 +242,18 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
 
         copy(
            unsafe.Slice((*byte) (unsafe.Pointer(&(msg.body))), messageBodySize),
-           unsafe.Slice((*byte) (unsafe.Pointer(&(grownInfosBytes[infoIndex * uint32(messageBodySize)]))), messageBodySize),
+           unsafe.Slice((*byte) (unsafe.Pointer(&(userInfosBytes[messageIndex * uint32(messageBodySize)]))), messageBodySize),
         )
 
         //sendMessage(connectionId, msg)
         fmt.Println("\n\nulr", msg.size, msg.index, msg.count, msg.body) // TODO: test only
+        messages = append(messages, *msg)
     }
+
+    // TODO: test only
+    //for _, msg := range messages {
+    //    xInfosCount = msg.size
+    //}
 
     return flagProceed
 }
