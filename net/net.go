@@ -181,8 +181,8 @@ func ProcessClients() {
 func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *sync.WaitGroup, onShutDownRequested *func()) {
     utils.Assert(waitGroup != nil && onShutDownRequested != nil)
 
-    closeConnection := func(clientDisconnected bool/*true if the connection was closed by the client*/) {
-        if clientDisconnected {
+    closeConnection := func(disconnectedByClient bool) {
+        if disconnectedByClient {
             utils.Assert(getConnectedUser(connectionId) != nil)
             onConnectionClosed(connectionId)
         }
