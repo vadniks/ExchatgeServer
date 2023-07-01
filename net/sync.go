@@ -27,6 +27,7 @@ const flagShutdown int32 = 0x7fffffff
 const toAnonymous uint32 = 0x7fffffff
 const toServer uint32 = 0x7ffffffe
 
+const stateConnected uint = 0
 const stateSecureConnectionEstablished uint = 1
 const stateLoggedWithCredentials uint = 2
 
@@ -55,9 +56,6 @@ var tokenServer = func() [tokenSize]byte { // letting clients to verify server's
 }()
 
 var bodyStub = [messageBodySize]byte{} // all zeroes
-
-var connectedUsers = make(map[uint32]*database.User) // key is connectionId
-var connectionStates = make(map[uint32]uint) // map[connectionId]state
 
 func simpleServerMessage(xFlag int32, xTo uint32) *message {
     return &message{
@@ -140,8 +138,8 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
         return flagFinishWithError
     }
 
-    connectedUsers[connectionId] = user
-    connectionStates[connectionId] = stateLoggedWithCredentials
+    setUser(connectionId, user)
+    setConnectionState(connectionId, stateLoggedWithCredentials)
 
     token := makeToken(connectionId, user.Id) // won't compile if inline the variable
     sendMessage(connectionId, serverMessage(flagLoggedIn, user.Id, token[:])) // here's how a client obtains his id
@@ -151,7 +149,7 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
 func registrationWithCredentialsRequested(connectionId uint32, msg *message) int32 {
     utils.Assert(msg != nil)
 
-    if len(database.GetAllUsers()) >= int(maxUsersCount) {
+    if len(database.GetAllUsers()) >= maxUsersCount {
         sendMessage(connectionId, simpleServerMessage(flagError, toAnonymous))
         return flagFinishWithError
     }
@@ -169,8 +167,7 @@ func registrationWithCredentialsRequested(connectionId uint32, msg *message) int
 }
 
 func finishRequested(connectionId uint32) int32 {
-    delete(connectedUsers, connectionId)
-    delete(connectionStates, connectionId)
+    deleteConnection(connectionId)
     return flagFinish
 }
 
@@ -242,26 +239,31 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
 func routeMessage(connectionId uint32, msg *message) int32 {
     utils.Assert(msg != nil)
     flag := msg.flag
-    xConnectionId, userId := openToken(msg.token)
+    xConnectionId, userIdFromToken := openToken(msg.token)
+
+    state := getConnectionState(connectionId)
+    utils.Assert(state != nil)
+    userId := getConnectedUserId(connectionId)
 
     if flag == flagLogIn || flag == flagRegister {
         utils.Assert( // TODO: it fails again!
-            connectionStates[connectionId] == 0 && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
+            *state == 0 && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
             msg.from == fromAnonymous &&
             xConnectionId == nil &&
-            userId == nil &&
+            userIdFromToken == nil &&
             msg.to == toServer,
         )
 
-        connectionStates[connectionId] = stateSecureConnectionEstablished
+        setConnectionState(connectionId,stateSecureConnectionEstablished)
     } else {
         utils.Assert(
-            connectionStates[connectionId] > 0 &&
+            *state > 0 &&
+            userId != nil &&
             msg.from != fromAnonymous &&
             msg.from != fromServer,
         )
 
-        if xConnectionId == nil || userId == nil || *xConnectionId != connectionId || *userId != connectedUsers[connectionId].Id {
+        if xConnectionId == nil || userIdFromToken == nil || *xConnectionId != connectionId || *userIdFromToken != *userId {
             sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
             finishRequested(connectionId)
             return flagFinishWithError
@@ -270,7 +272,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
 
     switch flag {
         case flagShutdown:
-            return shutdownRequested(connectionId, connectedUsers[connectionId], msg)
+            return shutdownRequested(connectionId, getUser(connectionId), msg)
         case flagProceed:
             return proceedRequested(msg)
         case flagLogIn:
@@ -281,7 +283,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
             utils.Assert(msg.to == toServer)
             return finishRequested(connectionId)
         case flagFetchUsers:
-            return usersListRequested(connectionId, *userId)
+            return usersListRequested(connectionId, *userIdFromToken)
         default:
             utils.JustThrow()
     }
@@ -291,6 +293,9 @@ func routeMessage(connectionId uint32, msg *message) int32 {
 func onConnectionClosed(connectionId uint32) { finishRequested(connectionId) }
 
 func findConnectUsr(userId uint32) (uint32, *database.User) { // nillable second result
-    for i, j := range connectedUsers { if j.Id == userId { return i, j } }
+    for connectionId, connectedUser := range connectedUsers {
+        utils.Assert(connectedUser != nil)
+        if user := connectedUser.user; user != nil && user.Id == userId { return connectionId, user }
+    }
     return 0, nil
 }

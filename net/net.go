@@ -3,6 +3,7 @@ package net
 
 import (
     "ExchatgeServer/crypto"
+    "ExchatgeServer/database"
     "ExchatgeServer/utils"
     "github.com/jamesruan/sodium"
     goNet "net"
@@ -16,12 +17,15 @@ const host = "localhost:8080"
 const intSize = 4
 const longSize = 8
 
+const maxUsersCount = 100
+
 const messageSize uint = 1 << 10 // exactly 1 kB
 const tokenTrailingSize uint = 16
 const tokenUnencryptedValueSize = 2 * intSize // 8
 const tokenSize = tokenUnencryptedValueSize + 40 + tokenTrailingSize // 48 + 16 = 64 = 2 encrypted ints + mac + nonce + missing bytes to reach signatureSize so the server can tokenize itself via signature whereas for clients server encrypts 2 ints (connectionId, userId)
 const messageHeadSize = intSize * 6 + longSize + tokenSize // 96
 const messageBodySize = messageSize - messageHeadSize // 928
+const userInfoSize = intSize + 1/*sizeof(bool)*/ + usernameSize // 21
 
 type net struct {
     serverPublicKey []byte
@@ -48,20 +52,98 @@ type userInfo struct {
     name [usernameSize]byte
 }
 
-const userInfoSize = intSize + 1/*sizeof(bool)*/ + usernameSize // 21
+type connectedUser struct {
+    connection *goNet.Conn
+    encryptionKey []byte
+    user *database.User // nillable
+    state uint
+}
+var connectedUsers = make(map[uint32/*connectionId*/]*connectedUser) // nillable values
 
-const maxUsersCount = 100
-
-var connections = make(map[uint32]*goNet.Conn) // key is connectionId
-var encryptionKeys = make(map[uint32][]byte) // key is connectionId
 var lastConnectionId uint32 = 0
 
-var tokenEncryptionKey = func() []byte {
+var tokenEncryptionKey = func() []byte { // TODO: move in crypto.go
     key := new(sodium.SecretBoxKey)
     sodium.Randomize(key)
     utils.Assert(len(key.Bytes) == int(crypto.KeySize))
     return key.Bytes
 }()
+
+func addNewConnection(connectionId uint32, connection *goNet.Conn, encryptionKey []byte) {
+    connectedUsers[connectionId] = &connectedUser{
+        connection: connection,
+        encryptionKey: encryptionKey,
+        user: nil,
+        state: stateConnected,
+    }
+}
+
+func getConnectedUser(connectionId uint32) *connectedUser { // nillable result
+    value, ok := connectedUsers[connectionId]
+    if ok {
+        utils.Assert(value != nil)
+        return value
+    } else {
+        return nil
+    }
+}
+
+func getEncryptionKey(connectionId uint32) []byte { // nillable result
+    xConnectedUser := getConnectedUser(connectionId)
+    if xConnectedUser == nil { return nil }
+    return xConnectedUser.encryptionKey
+}
+
+func getConnection(connectionId uint32) *goNet.Conn { // nillable result
+    xConnectedUser := getConnectedUser(connectionId)
+    if xConnectedUser == nil { return nil }
+    return xConnectedUser.connection
+}
+
+func getConnectionState(connectionId uint32) *uint { // nillable result
+    xConnectedUser := getConnectedUser(connectionId)
+    if xConnectedUser == nil { return nil }
+    return &(xConnectedUser.state)
+}
+
+func setConnectionState(connectionId uint32, state uint) bool { // returns true on success
+    if xConnectedUser := getConnectedUser(connectionId); xConnectedUser != nil {
+        xConnectedUser.state = state
+        return true
+    } else {
+        return false
+    }
+}
+
+func getUser(connectionId uint32) *database.User { // nillable result
+    xConnectedUser := getConnectedUser(connectionId)
+    if xConnectedUser == nil { return nil }
+    return xConnectedUser.user
+}
+
+func setUser(connectionId uint32, user *database.User) bool { // returns true on success
+    if xConnectedUser := getConnectedUser(connectionId); xConnectedUser != nil {
+        xConnectedUser.user = user
+        return true
+    } else {
+        return false
+    }
+}
+
+func getConnectedUserId(connectionId uint32) *uint32 { // nillable result
+    user := getUser(connectionId)
+    if user == nil { return nil }
+    return &(user.Id)
+}
+
+func deleteConnection(connectionId uint32) bool { // returns true on success
+    if xConnectedUser := getConnectedUser(connectionId); xConnectedUser != nil {
+        delete(connectedUsers, connectionId)
+        return true
+    } else {
+        return false
+    }
+}
 
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
 func (msg *message) pack() []byte {
@@ -176,21 +258,16 @@ func ProcessClients() {
         if err != nil { break }
 
         waitGroup.Add(1)
-        connections[lastConnectionId] = &connection
-        go processClient(lastConnectionId, &waitGroup, &onShutDownRequested)
+        go processClient(&connection, lastConnectionId, &waitGroup, &onShutDownRequested)
         lastConnectionId++
     }
 }
 
-func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownRequested *func()) {
+func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *sync.WaitGroup, onShutDownRequested *func()) {
     utils.Assert(waitGroup != nil && onShutDownRequested != nil)
-    connection := connections[connectionId]
 
     closeConnection := func() {
-        onConnectionClosed(connectionId)
-
-        delete(connections, connectionId)
-        delete(encryptionKeys, connectionId)
+        if getConnectedUser(connectionId) != nil { onConnectionClosed(connectionId) }
 
         lastConnectionId--
         waitGroup.Done()
@@ -208,7 +285,7 @@ func processClient(connectionId uint32, waitGroup *sync.WaitGroup, onShutDownReq
         closeConnection()
         return
     }
-    encryptionKeys[connectionId] = encryptionKey
+    addNewConnection(connectionId, connection, encryptionKey)
 
     messageBuffer := make([]byte, this.messageBufferSize)
     for {
@@ -255,7 +332,7 @@ func receive(connection *goNet.Conn, buffer []byte, /*nillable*/ error *bool) bo
 }
 
 func processClientMessage(connectionId uint32, messageBytes []byte) int32 {
-    encryptionKey := encryptionKeys[connectionId]
+    encryptionKey := getEncryptionKey(connectionId)
     utils.Assert(len(encryptionKey) > 0 && len(messageBytes) > 0)
 
     decrypted := crypto.Decrypt(messageBytes, encryptionKey)
@@ -265,10 +342,10 @@ func processClientMessage(connectionId uint32, messageBytes []byte) int32 {
 }
 
 func sendMessage(connectionId uint32, msg *message) {
-    encryptionKey := encryptionKeys[connectionId]
+    encryptionKey := getEncryptionKey(connectionId)
     utils.Assert(msg != nil && len(encryptionKey) > 0)
 
-    connection := connections[connectionId]
+    connection := getConnection(connectionId)
     utils.Assert(connection != nil)
 
     packed := msg.pack()
