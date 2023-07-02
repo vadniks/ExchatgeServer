@@ -8,16 +8,20 @@ import (
     "unsafe"
 )
 
-type idPool struct {
+type idsPool struct {
     ids big.Int
 }
 
-func initIdPool(size uint32) *idPool { // bitset, aka map[uint32/*id*/]bool/*taken*/
+func initIdsPool(size uint32) *idsPool { // bitset, aka map[uint32/*id*/]bool/*taken*/
     xFalse, _ := bools()
-    xIds := &idPool{big.Int{}}
+    xIds := &idsPool{big.Int{}}
 
     xIds.ids.SetBit(&(xIds.ids), int(size), 1)
-    utils.Assert(float64(len(xIds.ids.Bytes())) == math.Ceil(float64(size) / float64(8)) && xIds.ids.Bit(0) == uint(xFalse))
+
+    utils.Assert(
+        float64(len(xIds.ids.Bytes())) == math.Ceil(float64(size) / float64(8)) &&
+        xIds.ids.Bit(0) == uint(xFalse),
+    )
 
     return xIds
 }
@@ -34,7 +38,7 @@ func bools() (byte, byte) { // returns 0, 1 (false, true)
     return xxFalse, xxTrue
 }
 
-func (pool *idPool) takeId() *uint32 { // nillable result
+func (pool *idsPool) takeId() *uint32 { // nillable result
     xFalse, xTrue := bools()
 
     for i := uint32(0); i < uint32(maxUsersCount); i++ {
@@ -46,7 +50,7 @@ func (pool *idPool) takeId() *uint32 { // nillable result
     return nil
 }
 
-func (pool *idPool) returnId(id uint32) {
+func (pool *idsPool) returnId(id uint32) {
     xFalse, xTrue := bools()
     utils.Assert(id < maxUsersCount && pool.ids.Bit(int(id)) == uint(xTrue))
     pool.ids.SetBit(&(pool.ids), int(id), uint(xFalse))
