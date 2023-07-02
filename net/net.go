@@ -3,6 +3,7 @@ package net
 
 import (
     "ExchatgeServer/crypto"
+    "ExchatgeServer/idsPool"
     "ExchatgeServer/utils"
     goNet "net"
     "sync"
@@ -47,7 +48,7 @@ type userInfo struct {
     name [usernameSize]byte
 }
 
-var connectionIdsPool = func() *idsPool { return initIdsPool(maxUsersCount) }()
+var connectionIdsPool = func() *idsPool.IdsPool { return idsPool.InitIdsPool(maxUsersCount) }()
 
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
 func (msg *message) pack() []byte {
@@ -127,7 +128,7 @@ func ProcessClients() {
     var connectionId uint32 = 0
     for acceptingClients.Load() { // TODO: forbid logging in with credentials of an user which has already logged in and is still connected
 
-        if connectionIdPtr := connectionIdsPool.takeId(); connectionIdPtr == nil {
+        if connectionIdPtr := connectionIdsPool.TakeId(); connectionIdPtr == nil {
             sendDenialOfService(listener)
             continue
         } else {
@@ -163,7 +164,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *sync.
             utils.Assert(getConnectedUser(connectionId) == nil)
         }
 
-        connectionIdsPool.returnId(connectionId)
+        connectionIdsPool.ReturnId(connectionId)
         waitGroup.Done()
 
         utils.Assert((*connection).Close() == nil)

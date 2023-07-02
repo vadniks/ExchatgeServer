@@ -1,5 +1,5 @@
 
-package net
+package idsPool
 
 import (
     "ExchatgeServer/utils"
@@ -8,13 +8,14 @@ import (
     "unsafe"
 )
 
-type idsPool struct {
+type IdsPool struct {
+    size uint32
     ids big.Int
 }
 
-func initIdsPool(size uint32) *idsPool { // bitset, aka map[uint32/*id*/]bool/*taken*/
+func InitIdsPool(size uint32) *IdsPool { // bitset, aka map[uint32/*id*/]bool/*taken*/
     xFalse, _ := bools()
-    xIds := &idsPool{big.Int{}}
+    xIds := &IdsPool{size, big.Int{}}
 
     xIds.ids.SetBit(&(xIds.ids), int(size), 1)
 
@@ -38,10 +39,10 @@ func bools() (byte, byte) { // returns 0, 1 (false, true)
     return xxFalse, xxTrue
 }
 
-func (pool *idsPool) takeId() *uint32 { // nillable result
+func (pool *IdsPool) TakeId() *uint32 { // nillable result
     xFalse, xTrue := bools()
 
-    for i := uint32(0); i < uint32(maxUsersCount); i++ {
+    for i := uint32(0); i < pool.size; i++ {
         if pool.ids.Bit(int(i)) == uint(xFalse) {
             pool.ids.SetBit(&(pool.ids), int(i), uint(xTrue))
             return &i
@@ -50,8 +51,8 @@ func (pool *idsPool) takeId() *uint32 { // nillable result
     return nil
 }
 
-func (pool *idsPool) returnId(id uint32) {
+func (pool *IdsPool) ReturnId(id uint32) {
     xFalse, xTrue := bools()
-    utils.Assert(id < maxUsersCount && pool.ids.Bit(int(id)) == uint(xTrue))
+    utils.Assert(id < pool.size && pool.ids.Bit(int(id)) == uint(xTrue))
     pool.ids.SetBit(&(pool.ids), int(id), uint(xFalse))
 }
