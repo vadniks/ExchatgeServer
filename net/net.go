@@ -47,7 +47,7 @@ type userInfo struct {
     name [usernameSize]byte
 }
 
-var connectionIdsPool = func() *ids { return initIds(maxUsersCount) }()
+var connectionIdsPool = func() *idPool { return initIdPool(maxUsersCount) }()
 
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
 func (msg *message) pack() []byte {
