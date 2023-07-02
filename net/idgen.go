@@ -8,15 +8,19 @@ import (
     "unsafe"
 )
 
-var ids = func () *big.Int { // bitset, aka map[uint32/*id*/]bool/*taken*/
-    xFalse, _ := bools()
-    xIds := new(big.Int)
+type ids struct {
+    bigInt big.Int
+}
 
-    xIds.SetBit(xIds, maxUsersCount, 1)
-    utils.Assert(float64(len(xIds.Bytes())) == math.Ceil(float64(maxUsersCount) / float64(8)) && xIds.Bit(0) == uint(xFalse))
+func initIds(size uint32) *ids { // bitset, aka map[uint32/*id*/]bool/*taken*/
+    xFalse, _ := bools()
+    xIds := &ids{big.Int{}}
+
+    xIds.bigInt.SetBit(&(xIds.bigInt), int(size), 1)
+    utils.Assert(float64(len(xIds.bigInt.Bytes())) == math.Ceil(float64(size) / float64(8)) && xIds.bigInt.Bit(0) == uint(xFalse))
 
     return xIds
-}()
+}
 
 func bools() (byte, byte) { // returns 0, 1 (false, true)
     xFalse := false
@@ -30,20 +34,20 @@ func bools() (byte, byte) { // returns 0, 1 (false, true)
     return xxFalse, xxTrue
 }
 
-func takeId() *uint32 { // nillable result
+func (xIds *ids) takeId() *uint32 { // nillable result
     xFalse, xTrue := bools()
 
     for i := uint32(0); i < uint32(maxUsersCount); i++ {
-        if ids.Bit(int(i)) == uint(xFalse) { // if the id hasn't been taken
-            ids.SetBit(ids, int(i), uint(xTrue)) // take it
+        if xIds.bigInt.Bit(int(i)) == uint(xFalse) {
+            xIds.bigInt.SetBit(&(xIds.bigInt), int(i), uint(xTrue))
             return &i
         }
     }
     return nil
 }
 
-func returnId(id uint32) {
+func (xIds *ids) returnId(id uint32) {
     xFalse, xTrue := bools()
-    utils.Assert(id < maxUsersCount && ids.Bit(int(id)) == uint(xTrue))
-    ids.SetBit(ids, int(id), uint(xFalse))
+    utils.Assert(id < maxUsersCount && xIds.bigInt.Bit(int(id)) == uint(xTrue))
+    xIds.bigInt.SetBit(&(xIds.bigInt), int(id), uint(xFalse))
 }
