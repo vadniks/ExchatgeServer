@@ -37,23 +37,8 @@ const unhashedPasswordSize uint = 16
 const fromAnonymous uint32 = 0xffffffff
 const fromServer uint32 = 0x7fffffff
 
-var tokenAnonymous = make([]byte, tokenSize) // all zeroes
-
-var tokenServer = func() [tokenSize]byte { // letting clients to verify server's signature
-    //goland:noinspection GoBoolExpressions - just to make sure
-    utils.Assert(tokenSize == crypto.SignatureSize)
-
-    unsigned := make([]byte, tokenUnencryptedValueSize)
-    for i, _ := range unsigned { unsigned[i] = (1 << 8) - 1 } // 255
-
-    signed := crypto.Sign(unsigned)
-    utils.Assert(len(signed) - tokenUnencryptedValueSize == int(crypto.SignatureSize))
-
-    var arr [tokenSize]byte
-    copy(unsafe.Slice(&(arr[0]), messageBodySize), signed[:crypto.SignatureSize]) // only signature goes into token as clients know what's the signed constant value is
-
-    return arr
-}()
+var tokenAnonymous = make([]byte, crypto.TokenSize) // all zeroes
+var tokenServer = crypto.MakeServerToken(messageBodySize)
 
 var bodyStub = [messageBodySize]byte{} // all zeroes
 
@@ -92,9 +77,14 @@ func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
 
 func shutdownRequested(connectionId uint32, user *database.User, msg *message) int32 {
     utils.Assert(user != nil && msg.to == toServer)
-    if database.IsAdmin(user) { return flagShutdown }
-    sendMessage(connectionId, simpleServerMessage(flagAccessDenied, user.Id))
-    return flagProceed
+
+    if database.IsAdmin(user) {
+        finishRequested(connectionId)
+        return flagShutdown
+    } else {
+        sendMessage(connectionId, simpleServerMessage(flagAccessDenied, user.Id))
+        return flagProceed
+    }
 }
 
 //goland:noinspection GoRedundantConversion (*byte) - just silence that annoying warning already!
@@ -141,7 +131,7 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
     setUser(connectionId, user)
     setConnectionState(connectionId, stateLoggedWithCredentials)
 
-    token := makeToken(connectionId, user.Id) // won't compile if inline the variable
+    token := crypto.MakeToken(connectionId, user.Id) // won't compile if inline the variable
     sendMessage(connectionId, serverMessage(flagLoggedIn, user.Id, token[:])) // here's how a client obtains his id
     return flagProceed
 }
@@ -241,7 +231,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
 func routeMessage(connectionId uint32, msg *message) int32 {
     utils.Assert(msg != nil)
     flag := msg.flag
-    xConnectionId, userIdFromToken := openToken(msg.token)
+    xConnectionId, userIdFromToken := crypto.OpenToken(msg.token)
 
     state := getConnectionState(connectionId)
     utils.Assert(state != nil)

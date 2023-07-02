@@ -12,6 +12,10 @@ const macSize uint = 16
 const nonceSize uint = 24
 const HashSize uint = 128
 const SignatureSize uint = 64
+const intSize = 4
+const tokenUnencryptedValueSize = 2 * intSize // 8
+const tokenTrailingSize uint = 16
+const TokenSize = tokenUnencryptedValueSize + 40 + tokenTrailingSize // 48 + 16 = 64 = 2 encrypted ints + mac + nonce + missing bytes to reach signatureSize so the server can tokenize itself via signature whereas for clients server encrypts 2 ints (connectionId, userId)
 
 var signSecretKey = sodium.SignSecretKey{Bytes: []byte{
     211, 211, 189, 184, 216, 122, 65, 203,
@@ -23,6 +27,13 @@ var signSecretKey = sodium.SignSecretKey{Bytes: []byte{
     138, 54, 215, 5, 170, 139, 175, 148,
     71, 215, 74, 172, 27, 225, 26, 249,
 }}
+
+var tokenEncryptionKey = func() []byte {
+    key := new(sodium.SecretBoxKey)
+    sodium.Randomize(key)
+    utils.Assert(len(key.Bytes) == int(KeySize))
+    return key.Bytes
+}()
 
 func GenerateServerKeys() ([]byte, []byte) {
     serverKeys := sodium.MakeKXKP()
@@ -99,4 +110,51 @@ func Sign(bytes []byte) []byte {
     utils.Assert(len(result) == int(SignatureSize) + bytesSize)
 
     return result
+}
+
+//goland:noinspection GoRedundantConversion for (*byte) as without this it won't compile
+func MakeToken(connectionId uint32, userId uint32) [TokenSize]byte {
+    bytes := make([]byte, tokenUnencryptedValueSize)
+
+    copy(bytes, unsafe.Slice((*byte) (unsafe.Pointer(&connectionId)), intSize))
+    copy(unsafe.Slice(&(bytes[intSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&userId)), intSize))
+
+    encrypted := Encrypt(bytes, tokenEncryptionKey)
+    utils.Assert(len(encrypted) == int(TokenSize - tokenTrailingSize))
+
+    withTrailing := [TokenSize]byte{}
+    copy(unsafe.Slice(&(withTrailing[0]), TokenSize), encrypted)
+
+    return withTrailing
+}
+
+//goland:noinspection GoRedundantConversion for (*byte) as without this it won't compile
+func OpenToken(withTrailing [TokenSize]byte) (*uint32, *uint32) { // nillable results
+    token := withTrailing[:TokenSize - tokenTrailingSize]
+    utils.Assert(len(token) == int(EncryptedSize(tokenUnencryptedValueSize)))
+
+    decrypted := Decrypt(token, tokenEncryptionKey)
+    if decrypted == nil || len(decrypted) != tokenUnencryptedValueSize { return nil, nil }
+
+    connectionId := new(uint32); userId := new(uint32)
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(connectionId)), intSize), decrypted)
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(userId)), intSize), unsafe.Slice(&(decrypted[intSize]), intSize))
+
+    return connectionId, userId
+}
+
+func MakeServerToken(messageBodySize uint) [TokenSize]byte { // letting clients to verify server's signature
+    //goland:noinspection GoBoolExpressions - just to make sure
+    utils.Assert(TokenSize == SignatureSize)
+
+    unsigned := make([]byte, tokenUnencryptedValueSize)
+    for i, _ := range unsigned { unsigned[i] = (1 << 8) - 1 } // 255
+
+    signed := Sign(unsigned)
+    utils.Assert(len(signed) - tokenUnencryptedValueSize == int(SignatureSize))
+
+    var arr [TokenSize]byte
+    copy(unsafe.Slice(&(arr[0]), messageBodySize), signed[:SignatureSize]) // only signature goes into token as clients know what's the signed constant value is
+
+    return arr
 }

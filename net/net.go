@@ -4,7 +4,6 @@ package net
 import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/utils"
-    "github.com/jamesruan/sodium"
     goNet "net"
     "sync"
     "sync/atomic"
@@ -19,10 +18,7 @@ const longSize = 8
 const maxUsersCount = 100
 
 const messageSize uint = 1 << 10 // exactly 1 kB
-const tokenTrailingSize uint = 16
-const tokenUnencryptedValueSize = 2 * intSize // 8
-const tokenSize = tokenUnencryptedValueSize + 40 + tokenTrailingSize // 48 + 16 = 64 = 2 encrypted ints + mac + nonce + missing bytes to reach signatureSize so the server can tokenize itself via signature whereas for clients server encrypts 2 ints (connectionId, userId)
-const messageHeadSize = intSize * 6 + longSize + tokenSize // 96
+const messageHeadSize = intSize * 6 + longSize + crypto.TokenSize // 96
 const messageBodySize = messageSize - messageHeadSize // 928
 const userInfoSize = intSize + 1/*sizeof(bool)*/ + usernameSize // 21
 
@@ -41,7 +37,7 @@ type message struct {
     count uint32
     from uint32
     to uint32
-    token [tokenSize]byte
+    token [crypto.TokenSize]byte
     body [messageBodySize]byte // TODO: generate permanent encryption key for each conversation and store encrypted messages in a database
 }
 
@@ -50,13 +46,6 @@ type userInfo struct {
     connected bool
     name [usernameSize]byte
 }
-
-var tokenEncryptionKey = func() []byte { // TODO: move in crypto.go
-    key := new(sodium.SecretBoxKey)
-    sodium.Randomize(key)
-    utils.Assert(len(key.Bytes) == int(crypto.KeySize))
-    return key.Bytes
-}()
 
 var connectionIdsPool = func() *ids { return initIds(maxUsersCount) }()
 
@@ -72,7 +61,7 @@ func (msg *message) pack() []byte {
     copy(unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.count))), intSize))
     copy(unsafe.Slice(&(bytes[intSize * 4 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.from))), intSize))
     copy(unsafe.Slice(&(bytes[intSize * 5 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.to))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 6 + longSize]), tokenSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.token))), tokenSize))
+    copy(unsafe.Slice(&(bytes[intSize * 6 + longSize]), crypto.TokenSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.token))), crypto.TokenSize))
 
     copy(unsafe.Slice(&(bytes[messageHeadSize]), messageBodySize), unsafe.Slice(&(msg.body[0]), messageBodySize))
     return bytes
@@ -90,7 +79,7 @@ func unpackMessage(bytes []byte) *message {
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), intSize), unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize))
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.from))), intSize), unsafe.Slice(&(bytes[intSize * 4 + longSize]), intSize))
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.to))), intSize), unsafe.Slice(&(bytes[intSize * 5 + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.token))), tokenSize), unsafe.Slice(&(bytes[intSize * 6 + longSize]), tokenSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.token))), crypto.TokenSize), unsafe.Slice(&(bytes[intSize * 6 + longSize]), crypto.TokenSize))
 
     copy(unsafe.Slice(&(message.body[0]), messageBodySize), unsafe.Slice(&(bytes[messageHeadSize]), messageBodySize))
     return message
@@ -105,37 +94,6 @@ func (xUserInfo *userInfo) pack() []byte {
     copy(unsafe.Slice(&(bytes[intSize + 1]), usernameSize), unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.name))), usernameSize))
 
     return bytes
-}
-
-//goland:noinspection GoRedundantConversion for (*byte) as without this it won't compile
-func makeToken(connectionId uint32, userId uint32) [tokenSize]byte {
-    bytes := make([]byte, tokenUnencryptedValueSize)
-
-    copy(bytes, unsafe.Slice((*byte) (unsafe.Pointer(&connectionId)), intSize))
-    copy(unsafe.Slice(&(bytes[intSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&userId)), intSize))
-
-    encrypted := crypto.Encrypt(bytes, tokenEncryptionKey)
-    utils.Assert(len(encrypted) == int(tokenSize - tokenTrailingSize))
-
-    withTrailing := [tokenSize]byte{}
-    copy(unsafe.Slice(&(withTrailing[0]), tokenSize), encrypted)
-
-    return withTrailing
-}
-
-//goland:noinspection GoRedundantConversion for (*byte) as without this it won't compile
-func openToken(withTrailing [tokenSize]byte) (*uint32, *uint32) { // nillable results
-    token := withTrailing[:tokenSize - tokenTrailingSize]
-    utils.Assert(len(token) == int(crypto.EncryptedSize(tokenUnencryptedValueSize)))
-
-    decrypted := crypto.Decrypt(token, tokenEncryptionKey)
-    if decrypted == nil || len(decrypted) != tokenUnencryptedValueSize { return nil, nil }
-
-    connectionId := new(uint32); userId := new(uint32)
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(connectionId)), intSize), decrypted)
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(userId)), intSize), unsafe.Slice(&(decrypted[intSize]), intSize))
-
-    return connectionId, userId
 }
 
 func Initialize() {
