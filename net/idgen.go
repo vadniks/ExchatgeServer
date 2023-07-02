@@ -30,7 +30,7 @@ func bools() (byte, byte) { // returns 0, 1 (false, true)
     return xxFalse, xxTrue
 }
 
-func TakeId() *uint32 { // nillable result
+func takeId() *uint32 { // nillable result
     xFalse, xTrue := bools()
 
     for i := uint32(0); i < uint32(maxUsersCount); i++ {
@@ -42,7 +42,7 @@ func TakeId() *uint32 { // nillable result
     return nil
 }
 
-func ReturnId(id uint32) {
+func returnId(id uint32) {
     xFalse, xTrue := bools()
     utils.Assert(id < maxUsersCount && ids.Bit(int(id)) == uint(xTrue))
     ids.SetBit(ids, int(id), uint(xFalse))

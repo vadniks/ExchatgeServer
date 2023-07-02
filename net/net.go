@@ -51,8 +51,6 @@ type userInfo struct {
     name [usernameSize]byte
 }
 
-var lastConnectionId uint32 = 0
-
 var tokenEncryptionKey = func() []byte { // TODO: move in crypto.go
     key := new(sodium.SecretBoxKey)
     sodium.Randomize(key)
@@ -166,15 +164,20 @@ func ProcessClients() {
         waitGroup.Wait()
     }
 
-    for acceptingClients.Load() {
-        if lastConnectionId >= uint32(maxUsersCount) { break }
+    var connectionId uint32 = 0
+    for acceptingClients.Load() { // TODO: forbid logging in with credentials of an user which has already logged in and is still connected
+
+        if connectionIdPtr := takeId(); connectionIdPtr == nil {
+            continue // TODO: send flagConnectionsOverflow to clients
+        } else {
+            connectionId = *connectionIdPtr
+        }
 
         connection, err := listener.Accept()
         if err != nil { break }
 
         waitGroup.Add(1)
-        go processClient(&connection, lastConnectionId, &waitGroup, &onShutDownRequested)
-        lastConnectionId++
+        go processClient(&connection, connectionId, &waitGroup, &onShutDownRequested)
     }
 }
 
@@ -189,7 +192,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *sync.
             utils.Assert(getConnectedUser(connectionId) == nil)
         }
 
-        lastConnectionId-- // TODO: smth wrong with connectionIds - need to improve id issuing mechanism
+        returnId(connectionId)
         waitGroup.Done()
 
         utils.Assert((*connection).Close() == nil)
