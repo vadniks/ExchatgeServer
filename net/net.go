@@ -170,7 +170,8 @@ func ProcessClients() {
     for acceptingClients.Load() { // TODO: forbid logging in with credentials of an user which has already logged in and is still connected
 
         if connectionIdPtr := connectionIdsPool.takeId(); connectionIdPtr == nil {
-            continue // TODO: send flagConnectionsOverflow to clients
+            sendDenialOfService(listener)
+            continue
         } else {
             connectionId = *connectionIdPtr
         }
@@ -181,6 +182,16 @@ func ProcessClients() {
         waitGroup.Add(1)
         go processClient(&connection, connectionId, &waitGroup, &onShutDownRequested)
     }
+}
+
+func sendDenialOfService(listener goNet.Listener) {
+    connection, err := listener.Accept()
+    utils.Assert(err == nil)
+
+    send(&connection, crypto.Sign(make([]byte, crypto.KeySize)))
+
+    err = connection.Close()
+    utils.Assert(err == nil)
 }
 
 func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *sync.WaitGroup, onShutDownRequested *func()) {
