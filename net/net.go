@@ -16,7 +16,7 @@ const host = "localhost:8080"
 const intSize = 4
 const longSize = 8
 
-const maxUsersCount = 100
+const MaxUsersCount = 100
 
 const messageSize uint = 1 << 10 // exactly 1 kB
 const messageHeadSize = intSize * 6 + longSize + crypto.TokenSize // 96
@@ -106,7 +106,7 @@ func Initialize() {
        serverPublicKey,
        serverSecretKey,
        crypto.EncryptedSize(messageSize),
-        idsPool.InitIdsPool(maxUsersCount),
+        idsPool.InitIdsPool(MaxUsersCount),
     }
 }
 

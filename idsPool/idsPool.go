@@ -39,6 +39,12 @@ func bools() (byte, byte) { // returns 0, 1 (false, true)
     return xxFalse, xxTrue
 }
 
+func (pool *IdsPool) SetId(id uint32, taken bool) {
+    xFalse, xTrue := bools()
+    utils.Assert(id < pool.size)
+    pool.ids.SetBit(&(pool.ids), int(id), uint(func() byte { if taken { return xTrue } else { return xFalse } }()))
+}
+
 func (pool *IdsPool) TakeId() *uint32 { // nillable result
     xFalse, xTrue := bools()
 

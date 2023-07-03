@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-    database.Init()
+    database.Init(net.MaxUsersCount)
     net.Initialize()
     net.ProcessClients()
     database.Destroy()

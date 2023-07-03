@@ -3,6 +3,7 @@ package database
 
 import (
     "ExchatgeServer/crypto"
+    xIdsPool "ExchatgeServer/idsPool"
     "ExchatgeServer/utils"
     "context"
     "go.mongodb.org/mongo-driver/bson"
@@ -39,10 +40,11 @@ type database struct {
     client *mongo.Client
     adminUsername []byte
     adminPassword []byte
+    idsPool *xIdsPool.IdsPool
 }
 var this *database = nil
 
-func Init() { // TODO: authenticate database connection with password
+func Init(maxUsersCount uint32) { // TODO: authenticate database connection with password
     ctx := context.TODO()
 
     client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoUrl))
@@ -55,15 +57,24 @@ func Init() { // TODO: authenticate database connection with password
         client,
         []byte{'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
         crypto.Hash([]byte{'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}),
+        xIdsPool.InitIdsPool(maxUsersCount),
     }
 
     addAdminIfNotExists()
     mocData() // TODO: test only
+
+    loadIds()
+}
+
+func loadIds() {
+    for _, i := range GetAllUsers() {
+        this.idsPool.SetId(i.Id, true)
+    }
 }
 
 func Destroy() { utils.Assert(this.client.Disconnect(*(this.ctx)) == nil) }
 
-func addAdminIfNotExists() { // admin is the only user that has id equal to 0 TODO: how about adding an isAdmin field?
+func addAdminIfNotExists() { // admin is the only user that has id equal to 0
     if result := this.collection.FindOne(
         *(this.ctx),
         bson.D{{fieldId, 0}, {fieldName, this.adminUsername}},
@@ -102,20 +113,17 @@ func usernameAlreadyInUse(username []byte) bool { // username must be unique
     return result.Err() == nil
 }
 
-func availableUserId() uint32 { // TODO: maybe just use the real mongodb's _id?
-    var biggestId uint32 = 0
-    for _, i := range GetAllUsers() { if id := i.Id; id > biggestId { biggestId = id } }
-    return biggestId + 1
-}
+func availableUserId() *uint32 { return this.idsPool.TakeId() }
 
 func AddUser(username []byte, hashedPassword []byte) *User { // nillable result
     utils.Assert(len(username) > 0 && len(hashedPassword) == int(crypto.HashSize))
     if usernameAlreadyInUse(username) { return nil }
 
     userId := availableUserId()
-    utils.Assert(userId > 0)
+    if userId == nil { return nil }
+    utils.Assert(*userId > 0)
 
-    result, err := this.collection.InsertOne(*(this.ctx), User{Id: userId, Name: username, Password: hashedPassword})
+    result, err := this.collection.InsertOne(*(this.ctx), User{Id: *userId, Name: username, Password: hashedPassword})
     if result == nil || err != nil { return nil }
 
     result2 := this.collection.FindOne(*(this.ctx), bson.D{{fieldRealId, result.InsertedID}})
@@ -134,4 +142,10 @@ func GetAllUsers() []User {
     var users []User
     utils.Assert(cursor.All(*(this.ctx), &users) == nil && len(users) > 0)
     return users
+}
+
+func GetUsersCount() uint32 {
+    count, err := this.collection.EstimatedDocumentCount(*(this.ctx))
+    utils.Assert(err == nil)
+    return uint32(count)
 }

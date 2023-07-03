@@ -146,7 +146,7 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
 func registrationWithCredentialsRequested(connectionId uint32, msg *message) int32 {
     utils.Assert(msg != nil)
 
-    if len(database.GetAllUsers()) >= maxUsersCount {
+    if database.GetUsersCount() >= MaxUsersCount {
         sendMessage(connectionId, simpleServerMessage(flagError, toAnonymous))
         finishRequested(connectionId)
         return flagFinishWithError
