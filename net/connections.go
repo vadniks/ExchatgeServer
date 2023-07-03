@@ -13,10 +13,14 @@ type connectedUser struct {
     user *database.User // nillable
     state uint
 }
-var connectedUsers = make(map[uint32/*connectionId*/]*connectedUser) // nillable values
+
+type connectionsT struct {
+    connectedUsers map[uint32/*connectionId*/]*connectedUser // nillable values
+}
+var connections = &connectionsT{make(map[uint32]*connectedUser)}
 
 func addNewConnection(connectionId uint32, connection *goNet.Conn, encryptionKey []byte) {
-    connectedUsers[connectionId] = &connectedUser{
+    connections.connectedUsers[connectionId] = &connectedUser{
         connection: connection,
         encryptionKey: encryptionKey,
         user: nil,
@@ -25,7 +29,7 @@ func addNewConnection(connectionId uint32, connection *goNet.Conn, encryptionKey
 }
 
 func getConnectedUser(connectionId uint32) *connectedUser { // nillable result
-    value, ok := connectedUsers[connectionId]
+    value, ok := connections.connectedUsers[connectionId]
     if ok {
         utils.Assert(value != nil)
         return value
@@ -82,9 +86,17 @@ func getConnectedUserId(connectionId uint32) *uint32 { // nillable result
     return &(user.Id)
 }
 
+func findConnectUser(userId uint32) (uint32, *database.User) { // nillable second result
+    for connectionId, connectedUser := range connections.connectedUsers {
+        utils.Assert(connectedUser != nil)
+        if user := connectedUser.user; user != nil && user.Id == userId { return connectionId, user }
+    }
+    return 0, nil
+}
+
 func deleteConnection(connectionId uint32) bool { // returns true on success
     if xConnectedUser := getConnectedUser(connectionId); xConnectedUser != nil {
-        delete(connectedUsers, connectionId)
+        delete(connections.connectedUsers, connectionId)
         return true
     } else {
         return false

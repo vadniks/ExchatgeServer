@@ -37,10 +37,17 @@ const unhashedPasswordSize uint = 16
 const fromAnonymous uint32 = 0xffffffff
 const fromServer uint32 = 0x7fffffff
 
-var tokenAnonymous = make([]byte, crypto.TokenSize) // all zeroes
-var tokenServer = crypto.MakeServerToken(messageBodySize)
+type syncT struct {
+    tokenAnonymous []byte
+    tokenServer [crypto.TokenSize]byte
+    bodyStub [messageBodySize]byte
+}
 
-var bodyStub = [messageBodySize]byte{} // all zeroes
+var sync = &syncT{
+    make([]byte, crypto.TokenSize), // all zeroes
+    crypto.MakeServerToken(messageBodySize),
+    [messageBodySize]byte{}, // all zeroes
+}
 
 func simpleServerMessage(xFlag int32, xTo uint32) *message {
     return &message{
@@ -51,8 +58,8 @@ func simpleServerMessage(xFlag int32, xTo uint32) *message {
         count: 1,
         from: fromServer,
         to: xTo,
-        token: tokenServer,
-        body: bodyStub,
+        token: sync.tokenServer,
+        body: sync.bodyStub,
     }
 }
 
@@ -68,7 +75,7 @@ func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
         count: 1,
         from: fromServer,
         to: xTo,
-        token: tokenServer,
+        token: sync.tokenServer,
     }
 
     copy(unsafe.Slice(&(result.body[0]), messageBodySize), xBody)
@@ -91,7 +98,7 @@ func shutdownRequested(connectionId uint32, user *database.User, msg *message) i
 func proceedRequested(msg *message) int32 {
     utils.Assert(msg != nil && msg.to != msg.from)
 
-    if toUserConnectionId, toUser := findConnectUsr(msg.to); toUser != nil {
+    if toUserConnectionId, toUser := findConnectUser(msg.to); toUser != nil {
         sendMessage(toUserConnectionId, msg)
     } else {
         // TODO: user offline or doesn't exist
@@ -174,7 +181,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
 
     var infosCount uint32 = 0
     for _, user := range registeredUsers {
-        _, xUser := findConnectUsr(user.Id)
+        _, xUser := findConnectUser(user.Id)
 
         xUserInfo := &userInfo{
             id: user.Id,
@@ -213,7 +220,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
             count: messagesCount,
             from: fromServer,
             to: userId,
-            token: tokenServer,
+            token: sync.tokenServer,
             body: [messageBodySize]byte{},
         }
 
@@ -283,11 +290,3 @@ func routeMessage(connectionId uint32, msg *message) int32 {
 }
 
 func onConnectionClosed(connectionId uint32) { finishRequested(connectionId) }
-
-func findConnectUsr(userId uint32) (uint32, *database.User) { // nillable second result
-    for connectionId, connectedUser := range connectedUsers {
-        utils.Assert(connectedUser != nil)
-        if user := connectedUser.user; user != nil && user.Id == userId { return connectionId, user }
-    }
-    return 0, nil
-}

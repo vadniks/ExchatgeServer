@@ -14,8 +14,6 @@ import (
 const mongoUrl = "mongodb://127.0.0.1:27017/exchatge"
 const databaseName = "db"
 const collectionUsers = "users"
-const collectionConversations = "conversations"
-const collectionMessages = "messages"
 
 const fieldRealId = "_id"
 const fieldId = "id"
@@ -28,9 +26,6 @@ type User struct {
     Password []byte `bson:"password"` // salty-hashed
 }
 
-var adminUsername = []byte{'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-var adminPassword = crypto.Hash([]byte{'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
-
 func (user *User) passwordHashed() *User {
     user.Password = crypto.Hash(user.Password)
     return user
@@ -42,6 +37,8 @@ type database struct {
     ctx *context.Context
     collection *mongo.Collection
     client *mongo.Client
+    adminUsername []byte
+    adminPassword []byte
 }
 var this *database = nil
 
@@ -52,7 +49,13 @@ func Init() { // TODO: authenticate database connection with password
     utils.Assert(err == nil)
 
     collection := client.Database(databaseName).Collection(collectionUsers)
-    this = &database{&ctx, collection, client}
+    this = &database{
+        &ctx,
+        collection,
+        client,
+        []byte{'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        crypto.Hash([]byte{'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}),
+    }
 
     addAdminIfNotExists()
     mocData() // TODO: test only
@@ -63,9 +66,9 @@ func Destroy() { utils.Assert(this.client.Disconnect(*(this.ctx)) == nil) }
 func addAdminIfNotExists() { // admin is the only user that has id equal to 0 TODO: how about adding an isAdmin field?
     if result := this.collection.FindOne(
         *(this.ctx),
-        bson.D{{fieldId, 0}, {fieldName, adminUsername}},
+        bson.D{{fieldId, 0}, {fieldName, this.adminUsername}},
     ); result.Err() == mongo.ErrNoDocuments {
-        _, err := this.collection.InsertOne(*(this.ctx), User{Id: 0, Name: adminUsername, Password: adminPassword})
+        _, err := this.collection.InsertOne(*(this.ctx), User{Id: 0, Name: this.adminUsername, Password: this.adminPassword})
         utils.Assert(err == nil)
     }
 }

@@ -6,7 +6,7 @@ import (
     "ExchatgeServer/idsPool"
     "ExchatgeServer/utils"
     goNet "net"
-    "sync"
+    goSync "sync"
     "sync/atomic"
     "unsafe"
 )
@@ -23,12 +23,13 @@ const messageHeadSize = intSize * 6 + longSize + crypto.TokenSize // 96
 const messageBodySize = messageSize - messageHeadSize // 928
 const userInfoSize = intSize + 1/*sizeof(bool)*/ + usernameSize // 21
 
-type net struct {
+type netT struct {
     serverPublicKey []byte
     serverSecretKey []byte
     messageBufferSize uint
+    connectionIdsPool *idsPool.IdsPool
 }
-var this *net = nil
+var net *netT = nil
 
 type message struct {
     flag int32
@@ -47,8 +48,6 @@ type userInfo struct {
     connected bool
     name [usernameSize]byte
 }
-
-var connectionIdsPool = func() *idsPool.IdsPool { return idsPool.InitIdsPool(maxUsersCount) }()
 
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
 func (msg *message) pack() []byte {
@@ -103,10 +102,11 @@ func Initialize() {
 
     serverPublicKey, serverSecretKey := crypto.GenerateServerKeys()
 
-    this = &net{
+    net = &netT{
        serverPublicKey,
        serverSecretKey,
        crypto.EncryptedSize(messageSize),
+        idsPool.InitIdsPool(maxUsersCount),
     }
 }
 
@@ -114,7 +114,7 @@ func ProcessClients() {
     listener, err := goNet.Listen("tcp", host)
     utils.Assert(err == nil)
 
-    var waitGroup sync.WaitGroup
+    var waitGroup goSync.WaitGroup
 
     var acceptingClients atomic.Bool
     acceptingClients.Store(true)
@@ -128,7 +128,7 @@ func ProcessClients() {
     var connectionId uint32 = 0
     for acceptingClients.Load() { // TODO: forbid logging in with credentials of an user which has already logged in and is still connected
 
-        if connectionIdPtr := connectionIdsPool.TakeId(); connectionIdPtr == nil {
+        if connectionIdPtr := net.connectionIdsPool.TakeId(); connectionIdPtr == nil {
             sendDenialOfService(listener)
             continue
         } else {
@@ -153,7 +153,7 @@ func sendDenialOfService(listener goNet.Listener) {
     utils.Assert(err == nil)
 }
 
-func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *sync.WaitGroup, onShutDownRequested *func()) {
+func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSync.WaitGroup, onShutDownRequested *func()) {
     utils.Assert(waitGroup != nil && onShutDownRequested != nil)
 
     closeConnection := func(disconnectedByClient bool) {
@@ -164,25 +164,25 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *sync.
             utils.Assert(getConnectedUser(connectionId) == nil)
         }
 
-        connectionIdsPool.ReturnId(connectionId)
+        net.connectionIdsPool.ReturnId(connectionId)
         waitGroup.Done()
 
         utils.Assert((*connection).Close() == nil)
     }
 
-    send(connection, crypto.Sign(this.serverPublicKey))
+    send(connection, crypto.Sign(net.serverPublicKey))
 
     clientPublicKey := make([]byte, crypto.KeySize)
     receive(connection, clientPublicKey, nil)
 
-    encryptionKey := crypto.ExchangeKeys(this.serverPublicKey, this.serverSecretKey, clientPublicKey)
+    encryptionKey := crypto.ExchangeKeys(net.serverPublicKey, net.serverSecretKey, clientPublicKey)
     if encryptionKey == nil {
         closeConnection(false)
         return
     }
     addNewConnection(connectionId, connection, encryptionKey)
 
-    messageBuffer := make([]byte, this.messageBufferSize)
+    messageBuffer := make([]byte, net.messageBufferSize)
     for {
         disconnected := false
 
