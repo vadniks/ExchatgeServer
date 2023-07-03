@@ -85,6 +85,7 @@ func unpackMessage(bytes []byte) *message {
     return message
 }
 
+//goland:noinspection GoRedundantConversion
 func (xUserInfo *userInfo) pack() []byte {
     utils.Assert(unsafe.Sizeof(false) == 1)
     bytes := make([]byte, userInfoSize)
