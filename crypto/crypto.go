@@ -124,8 +124,8 @@ func (crypto *Crypto) Decrypt(bytes []byte) []byte {
     crypto.decoderBuffer.Write(bytes)
 
     decrypted := make([]byte, bytesSize)
-    writtenCount, err := crypto.decoderBuffer.Read(decrypted)
-    if writtenCount != int(bytesSize) || err != nil { return nil }
+    writtenCount, err := crypto.decoder.Read(decrypted)
+    if writtenCount != int(bytesSize - encryptedAdditionalBytesSize) || err != nil { fmt.Println(bytesSize, writtenCount, err); return nil }
 
     return decrypted
 }
@@ -187,7 +187,7 @@ func MakeToken(connectionId uint32, userId uint32) [TokenSize]byte {
     copy(unsafe.Slice(&(bytes[intSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&userId)), intSize))
 
     encrypted := encryptSingle(bytes, tokenEncryptionKey)
-    utils.Assert(len(encrypted) == int(TokenSize - tokenTrailingSize))
+    utils.Assert(len(encrypted) == int(TokenSize - tokenTrailingSize)) // TODO: now it fails here
 
     withTrailing := [TokenSize]byte{}
     copy(unsafe.Slice(&(withTrailing[0]), TokenSize), encrypted)
