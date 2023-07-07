@@ -116,6 +116,7 @@ func (crypto *Crypto) Encrypt(bytes []byte) []byte { // nillable result
 func (crypto *Crypto) Decrypt(bytes []byte) []byte {
     bytesSize := uint(len(bytes))
     utils.Assert(bytesSize > 0 && crypto.encoder != nil && crypto.decoder != nil)
+    crypto.decoderBuffer.Write(bytes)
 
     decrypted := make([]byte, bytesSize)
     writtenCount, err := crypto.decoderBuffer.Read(decrypted)
