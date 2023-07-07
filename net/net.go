@@ -174,7 +174,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
     send(connection, crypto.Sign(net.serverPublicKey))
 
     clientPublicKey := make([]byte, crypto.KeySize)
-    receive(connection, clientPublicKey, nil)
+    utils.Assert(receive(connection, clientPublicKey, nil))
 
     serverKey, clientKey := crypto.ExchangeKeys(net.serverPublicKey, net.serverSecretKey, clientPublicKey)
     if serverKey == nil || clientKey == nil {
@@ -186,7 +186,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
     send(connection, crypto.Sign(serverStreamHeader))
 
     clientStreamHeader := make([]byte, crypto.HeaderSize)
-    receive(connection, clientStreamHeader, nil)
+    utils.Assert(receive(connection, clientStreamHeader, nil))
 
     if !xCrypto.CreateDecoderStream(clientKey, clientStreamHeader) {
         closeConnection(false)

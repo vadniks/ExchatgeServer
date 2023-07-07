@@ -51,6 +51,7 @@ func GenerateServerKeys() ([]byte, []byte) {
 }
 
 func EncryptedSize(unencryptedSize uint) uint { return unencryptedSize + encryptedAdditionalBytesSize }
+func encryptedSingleSize(unencryptedSize uint) uint { return macSize + unencryptedSize + nonceSize }
 func SignedSize(unsignedSize uint) uint { return unsignedSize + SignatureSize }
 
 func ExchangeKeys(serverPublicKey []byte, serverSecretKey []byte, clientPublicKey []byte) ([]byte, []byte) { // returns nillable serverKey & clientKey
@@ -193,7 +194,7 @@ func MakeToken(connectionId uint32, userId uint32) [TokenSize]byte {
 //goland:noinspection GoRedundantConversion for (*byte) as without this it won't compile
 func OpenToken(withTrailing [TokenSize]byte) (*uint32, *uint32) { // nillable results
     token := withTrailing[:TokenSize - tokenTrailingSize]
-    utils.Assert(len(token) == int(EncryptedSize(tokenUnencryptedValueSize)))
+    utils.Assert(len(token) == int(encryptedSingleSize(tokenUnencryptedValueSize)))
 
     decrypted := decryptSingle(token, tokenEncryptionKey)
     if decrypted == nil || len(decrypted) != tokenUnencryptedValueSize { return nil, nil }
