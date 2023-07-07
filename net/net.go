@@ -176,12 +176,24 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
     clientPublicKey := make([]byte, crypto.KeySize)
     receive(connection, clientPublicKey, nil)
 
-    encryptionKey := crypto.ExchangeKeys(net.serverPublicKey, net.serverSecretKey, clientPublicKey)
-    if encryptionKey == nil {
+    serverKey, clientKey := crypto.ExchangeKeys(net.serverPublicKey, net.serverSecretKey, clientPublicKey)
+    if serverKey == nil || clientKey == nil {
         closeConnection(false)
         return
     }
-    addNewConnection(connectionId, connection, encryptionKey)
+
+    serverStreamHeader, xCrypto := crypto.CreateEncoderStream(serverKey)
+    send(connection, crypto.Sign(serverStreamHeader))
+
+    clientStreamHeader := make([]byte, crypto.HeaderSize)
+    receive(connection, clientStreamHeader, nil)
+
+    if !xCrypto.CreateDecoderStream(clientKey, clientStreamHeader) {
+        closeConnection(false)
+        return
+    }
+
+    addNewConnection(connectionId, connection, xCrypto)
 
     messageBuffer := make([]byte, net.messageBufferSize)
     for {
@@ -228,24 +240,24 @@ func receive(connection *goNet.Conn, buffer []byte, /*nillable*/ error *bool) bo
 }
 
 func processClientMessage(connectionId uint32, messageBytes []byte) int32 {
-    encryptionKey := getEncryptionKey(connectionId)
-    utils.Assert(len(encryptionKey) > 0 && len(messageBytes) > 0)
+    xCrypto := getCrypto(connectionId)
+    utils.Assert(xCrypto != nil && len(messageBytes) > 0)
 
-    decrypted := crypto.Decrypt(messageBytes, encryptionKey)
+    decrypted := xCrypto.Decrypt(messageBytes)
     message := unpackMessage(decrypted)
 
     return routeMessage(connectionId, message)
 }
 
 func sendMessage(connectionId uint32, msg *message) {
-    encryptionKey := getEncryptionKey(connectionId)
-    utils.Assert(msg != nil && len(encryptionKey) > 0)
+    xCrypto := getCrypto(connectionId)
+    utils.Assert(msg != nil && xCrypto != nil)
 
     connection := getConnection(connectionId)
     utils.Assert(connection != nil)
 
     packed := msg.pack()
-    encrypted := crypto.Encrypt(packed, encryptionKey)
+    encrypted := xCrypto.Encrypt(packed)
 
     send(connection, encrypted)
 }

@@ -3,11 +3,14 @@ package crypto
 
 import (
     "ExchatgeServer/utils"
+    "bytes"
     "github.com/jamesruan/sodium"
     "unsafe"
 )
 
 const KeySize uint = 32
+const HeaderSize uint = 24
+const encryptedAdditionalBytesSize = 17
 const macSize uint = 16
 const nonceSize uint = 24
 const HashSize uint = 128
@@ -16,6 +19,13 @@ const intSize = 4
 const tokenUnencryptedValueSize = 2 * intSize // 8
 const tokenTrailingSize uint = 16
 const TokenSize = tokenUnencryptedValueSize + 40 + tokenTrailingSize // 48 + 16 = 64 = 2 encrypted ints + mac + nonce + missing bytes to reach signatureSize so the server can tokenize itself via signature whereas for clients server encrypts 2 ints (connectionId, userId)
+
+type Crypto struct {
+    encoderBuffer *bytes.Buffer
+    decoderBuffer *bytes.Buffer
+    encoder sodium.SecretStreamEncoder
+    decoder sodium.SecretStreamDecoder
+}
 
 var signSecretKey = sodium.SignSecretKey{Bytes: []byte{
     211, 211, 189, 184, 216, 122, 65, 203,
@@ -40,10 +50,10 @@ func GenerateServerKeys() ([]byte, []byte) {
     return serverKeys.PublicKey.Bytes, serverKeys.SecretKey.Bytes
 }
 
-func EncryptedSize(unencryptedSize uint) uint { return macSize + unencryptedSize + nonceSize }
+func EncryptedSize(unencryptedSize uint) uint { return unencryptedSize + encryptedAdditionalBytesSize }
 func SignedSize(unsignedSize uint) uint { return unsignedSize + SignatureSize }
 
-func ExchangeKeys(serverPublicKey []byte, serverSecretKey []byte, clientPublicKey []byte) []byte { // returns nillable encryptionKey
+func ExchangeKeys(serverPublicKey []byte, serverSecretKey []byte, clientPublicKey []byte) ([]byte, []byte) { // returns nillable serverKey & clientKey
     utils.Assert(
         len(serverPublicKey) == int(KeySize) &&
         len(serverSecretKey) == int(KeySize) &&
@@ -57,39 +67,61 @@ func ExchangeKeys(serverPublicKey []byte, serverSecretKey []byte, clientPublicKe
     sessionKeys, err := keys.ServerSessionKeys(sodium.KXPublicKey{Bytes: clientPublicKey})
 
     if err == nil {
-        return sessionKeys.Rx.Bytes
+        return sessionKeys.Rx.Bytes, sessionKeys.Tx.Bytes
     } else {
-        return nil
+        return nil, nil
     }
 }
 
-func Encrypt(bytes []byte, key []byte) []byte {
+func CreateEncoderStream(serverKey []byte) ([]byte, *Crypto) { // returns server stream header
+    utils.Assert(len(serverKey) == int(KeySize))
+
+    encoderBuffer := new(bytes.Buffer)
+    crypto := &Crypto{
+        encoderBuffer,
+        new(bytes.Buffer),
+        sodium.MakeSecretStreamXCPEncoder(sodium.SecretStreamXCPKey{Bytes: serverKey}, encoderBuffer),
+        nil,
+    }
+
+    return crypto.encoder.Header().Bytes, crypto
+}
+
+func (crypto *Crypto) CreateDecoderStream(clientKey []byte, clientStreamHeader []byte) bool { // returns true on success
+    utils.Assert(len(clientKey) == int(KeySize) && len(clientStreamHeader) == int(HeaderSize))
+
+    var err error
+    crypto.decoder, err = sodium.MakeSecretStreamXCPDecoder(
+        sodium.SecretStreamXCPKey{Bytes: clientKey},
+        crypto.decoderBuffer,
+        sodium.SecretStreamXCPHeader{Bytes: clientStreamHeader},
+    )
+    return err == nil
+}
+
+func (crypto *Crypto) Encrypt(bytes []byte) []byte { // nillable result
     bytesSize := uint(len(bytes))
-    utils.Assert(bytesSize > 0 && uint(len(key)) == KeySize)
+    utils.Assert(bytesSize > 0 && crypto.encoder != nil && crypto.decoder != nil)
 
-    nonce := sodium.SecretBoxNonce{}
-    sodium.Randomize(&nonce)
+    writtenCount, err := crypto.encoder.Write(bytes)
+    if writtenCount != int(bytesSize) || err != nil { return nil }
 
-    ciphered := sodium.Bytes(bytes).SecretBox(nonce, sodium.SecretBoxKey{Bytes: key})
     encrypted := make([]byte, EncryptedSize(bytesSize))
-
-    copy(encrypted, ciphered)
-    copy(unsafe.Slice(&(encrypted[bytesSize + macSize]), nonceSize), nonce.Bytes)
+    writtenCount, err = crypto.encoderBuffer.Read(encrypted)
+    if writtenCount != int(bytesSize) || err != nil { return nil }
 
     return encrypted
 }
 
-func Decrypt(bytes []byte, key []byte) []byte {
+func (crypto *Crypto) Decrypt(bytes []byte) []byte {
     bytesSize := uint(len(bytes))
-    utils.Assert(bytesSize > 0 && len(key) == int(KeySize))
+    utils.Assert(bytesSize > 0 && crypto.encoder != nil && crypto.decoder != nil)
 
-    encryptedWithoutNonceSize := bytesSize - nonceSize
+    decrypted := make([]byte, bytesSize)
+    writtenCount, err := crypto.decoderBuffer.Read(decrypted)
+    if writtenCount != int(bytesSize) || err != nil { return nil }
 
-    nonce := sodium.SecretBoxNonce{Bytes: sodium.Bytes(bytes[encryptedWithoutNonceSize:])}
-    boxKey := sodium.SecretBoxKey{Bytes: key}
-
-    decrypted, err := sodium.Bytes(bytes[:encryptedWithoutNonceSize]).SecretBoxOpen(nonce, boxKey)
-    if err == nil { return decrypted } else { return nil }
+    return decrypted
 }
 
 func Hash(bytes []byte) []byte {
@@ -112,6 +144,35 @@ func Sign(bytes []byte) []byte {
     return result
 }
 
+func encryptSingle(bytes []byte, key []byte) []byte { // encrypts only one message, compared with Encrypt, which encrypts a set of related messages
+    bytesSize := uint(len(bytes))
+    utils.Assert(bytesSize > 0 && uint(len(key)) == KeySize)
+
+    nonce := sodium.SecretBoxNonce{}
+    sodium.Randomize(&nonce)
+
+    ciphered := sodium.Bytes(bytes).SecretBox(nonce, sodium.SecretBoxKey{Bytes: key})
+    encrypted := make([]byte, EncryptedSize(bytesSize))
+
+    copy(encrypted, ciphered)
+    copy(unsafe.Slice(&(encrypted[bytesSize + macSize]), nonceSize), nonce.Bytes)
+
+    return encrypted
+}
+
+func decryptSingle(bytes []byte, key []byte) []byte { // same as encryptSingle
+    bytesSize := uint(len(bytes))
+    utils.Assert(bytesSize > 0 && len(key) == int(KeySize))
+
+    encryptedWithoutNonceSize := bytesSize - nonceSize
+
+    nonce := sodium.SecretBoxNonce{Bytes: sodium.Bytes(bytes[encryptedWithoutNonceSize:])}
+    boxKey := sodium.SecretBoxKey{Bytes: key}
+
+    decrypted, err := sodium.Bytes(bytes[:encryptedWithoutNonceSize]).SecretBoxOpen(nonce, boxKey)
+    if err == nil { return decrypted } else { return nil }
+}
+
 //goland:noinspection GoRedundantConversion for (*byte) as without this it won't compile
 func MakeToken(connectionId uint32, userId uint32) [TokenSize]byte {
     bytes := make([]byte, tokenUnencryptedValueSize)
@@ -119,7 +180,7 @@ func MakeToken(connectionId uint32, userId uint32) [TokenSize]byte {
     copy(bytes, unsafe.Slice((*byte) (unsafe.Pointer(&connectionId)), intSize))
     copy(unsafe.Slice(&(bytes[intSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&userId)), intSize))
 
-    encrypted := Encrypt(bytes, tokenEncryptionKey)
+    encrypted := encryptSingle(bytes, tokenEncryptionKey)
     utils.Assert(len(encrypted) == int(TokenSize - tokenTrailingSize))
 
     withTrailing := [TokenSize]byte{}
@@ -133,7 +194,7 @@ func OpenToken(withTrailing [TokenSize]byte) (*uint32, *uint32) { // nillable re
     token := withTrailing[:TokenSize - tokenTrailingSize]
     utils.Assert(len(token) == int(EncryptedSize(tokenUnencryptedValueSize)))
 
-    decrypted := Decrypt(token, tokenEncryptionKey)
+    decrypted := decryptSingle(token, tokenEncryptionKey)
     if decrypted == nil || len(decrypted) != tokenUnencryptedValueSize { return nil, nil }
 
     connectionId := new(uint32); userId := new(uint32)

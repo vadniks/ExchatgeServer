@@ -2,6 +2,7 @@
 package net
 
 import (
+    xCrypto "ExchatgeServer/crypto"
     "ExchatgeServer/database"
     "ExchatgeServer/utils"
     goNet "net"
@@ -9,7 +10,7 @@ import (
 
 type connectedUser struct {
     connection *goNet.Conn
-    encryptionKey []byte
+    crypto *xCrypto.Crypto
     user *database.User // nillable
     state uint
 }
@@ -19,10 +20,10 @@ type connectionsT struct {
 }
 var connections = &connectionsT{make(map[uint32]*connectedUser)}
 
-func addNewConnection(connectionId uint32, connection *goNet.Conn, encryptionKey []byte) {
+func addNewConnection(connectionId uint32, connection *goNet.Conn, xxCrypto *xCrypto.Crypto) {
     connections.connectedUsers[connectionId] = &connectedUser{
         connection: connection,
-        encryptionKey: encryptionKey,
+        crypto: xxCrypto,
         user: nil,
         state: stateConnected,
     }
@@ -38,10 +39,10 @@ func getConnectedUser(connectionId uint32) *connectedUser { // nillable result
     }
 }
 
-func getEncryptionKey(connectionId uint32) []byte { // nillable result
+func getCrypto(connectionId uint32) *xCrypto.Crypto { // nillable result
     xConnectedUser := getConnectedUser(connectionId)
     if xConnectedUser == nil { return nil }
-    return xConnectedUser.encryptionKey
+    return xConnectedUser.crypto
 }
 
 func getConnection(connectionId uint32) *goNet.Conn { // nillable result
