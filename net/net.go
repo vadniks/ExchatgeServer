@@ -5,6 +5,7 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/idsPool"
     "ExchatgeServer/utils"
+    "fmt"
     goNet "net"
     goSync "sync"
     "sync/atomic"
@@ -192,6 +193,11 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
         closeConnection(false)
         return
     }
+
+    fmt.Println("server public key", net.serverPublicKey)
+    fmt.Println("client public key", clientPublicKey)
+    fmt.Println("server header", serverStreamHeader)
+    fmt.Println("client header", clientStreamHeader)
 
     addNewConnection(connectionId, connection, xCrypto)
 

@@ -4,6 +4,7 @@ package crypto
 import (
     "ExchatgeServer/utils"
     "bytes"
+    "fmt"
     "github.com/jamesruan/sodium"
     "unsafe"
 )
@@ -66,6 +67,9 @@ func ExchangeKeys(serverPublicKey []byte, serverSecretKey []byte, clientPublicKe
         SecretKey: sodium.KXSecretKey{Bytes: serverSecretKey},
     }
     sessionKeys, err := keys.ServerSessionKeys(sodium.KXPublicKey{Bytes: clientPublicKey})
+
+    fmt.Println("server key", sessionKeys.Rx.Bytes)
+    fmt.Println("client key", sessionKeys.Tx.Bytes)
 
     if err == nil {
         return sessionKeys.Rx.Bytes, sessionKeys.Tx.Bytes

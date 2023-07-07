@@ -5,6 +5,7 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/database"
     "ExchatgeServer/utils"
+    "fmt"
     "math"
     "unsafe"
 )
@@ -244,6 +245,15 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     utils.Assert(state != nil)
     userId := getConnectedUserId(connectionId)
 
+    fmt.Println( // TODO: getting wrong results here - decryption not working
+        msg.flag,
+        msg.size,
+        msg.index,
+        msg.count,
+        msg.from,
+        msg.to,
+    )
+
     if flag == flagLogIn || flag == flagRegister {
         utils.Assert(
             *state == 0 && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
@@ -255,7 +265,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
 
         setConnectionState(connectionId,stateSecureConnectionEstablished)
     } else {
-        utils.Assert(
+        utils.Assert( // TODO: and 'cause of that, here fail is occurred
             *state > 0 &&
             userId != nil &&
             msg.from != fromAnonymous &&
