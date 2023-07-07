@@ -3,7 +3,7 @@ package crypto
 
 import (
     "ExchatgeServer/utils"
-    "bytes"
+    xBytes "bytes"
     "fmt"
     "github.com/jamesruan/sodium"
     "unsafe"
@@ -22,8 +22,8 @@ const tokenTrailingSize uint = 16
 const TokenSize = tokenUnencryptedValueSize + 40 + tokenTrailingSize // 48 + 16 = 64 = 2 encrypted ints + mac + nonce + missing bytes to reach signatureSize so the server can tokenize itself via signature whereas for clients server encrypts 2 ints (connectionId, userId)
 
 type Crypto struct {
-    encoderBuffer *bytes.Buffer
-    decoderBuffer *bytes.Buffer
+    encoderBuffer *xBytes.Buffer
+    decoderBuffer *xBytes.Buffer
     encoder sodium.SecretStreamEncoder
     decoder sodium.SecretStreamDecoder
 }
@@ -81,10 +81,10 @@ func ExchangeKeys(serverPublicKey []byte, serverSecretKey []byte, clientPublicKe
 func CreateEncoderStream(serverKey []byte) ([]byte, *Crypto) { // returns server stream header
     utils.Assert(len(serverKey) == int(KeySize))
 
-    encoderBuffer := new(bytes.Buffer)
+    encoderBuffer := new(xBytes.Buffer)
     crypto := &Crypto{
         encoderBuffer,
-        new(bytes.Buffer),
+        new(xBytes.Buffer),
         sodium.MakeSecretStreamXCPEncoder(sodium.SecretStreamXCPKey{Bytes: serverKey}, encoderBuffer),
         nil,
     }
@@ -158,7 +158,7 @@ func encryptSingle(bytes []byte, key []byte) []byte { // encrypts only one messa
     sodium.Randomize(&nonce)
 
     ciphered := sodium.Bytes(bytes).SecretBox(nonce, sodium.SecretBoxKey{Bytes: key})
-    encrypted := make([]byte, EncryptedSize(bytesSize))
+    encrypted := make([]byte, encryptedSingleSize(bytesSize))
 
     copy(encrypted, ciphered)
     copy(unsafe.Slice(&(encrypted[bytesSize + macSize]), nonceSize), nonce.Bytes)
@@ -187,7 +187,7 @@ func MakeToken(connectionId uint32, userId uint32) [TokenSize]byte {
     copy(unsafe.Slice(&(bytes[intSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&userId)), intSize))
 
     encrypted := encryptSingle(bytes, tokenEncryptionKey)
-    utils.Assert(len(encrypted) == int(TokenSize - tokenTrailingSize)) // TODO: now it fails here
+    utils.Assert(len(encrypted) == int(TokenSize - tokenTrailingSize))
 
     withTrailing := [TokenSize]byte{}
     copy(unsafe.Slice(&(withTrailing[0]), TokenSize), encrypted)

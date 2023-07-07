@@ -230,7 +230,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
 }
 
 func send(connection *goNet.Conn, payload []byte) {
-    utils.Assert(connection != nil && len(payload) > 0)
+    utils.Assert(connection != nil && len(payload) > 0) // TODO: now it fails here
     count, err := (*connection).Write(payload)
     utils.Assert(count == len(payload) && err == nil)
 }
