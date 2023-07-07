@@ -4,7 +4,6 @@ package crypto
 import (
     "ExchatgeServer/utils"
     xBytes "bytes"
-    "fmt"
     "github.com/jamesruan/sodium"
     "unsafe"
 )
@@ -68,9 +67,6 @@ func ExchangeKeys(serverPublicKey []byte, serverSecretKey []byte, clientPublicKe
     }
     sessionKeys, err := keys.ServerSessionKeys(sodium.KXPublicKey{Bytes: clientPublicKey})
 
-    fmt.Println("server key", sessionKeys.Rx.Bytes)
-    fmt.Println("client key", sessionKeys.Tx.Bytes)
-
     if err == nil {
         return sessionKeys.Rx.Bytes, sessionKeys.Tx.Bytes
     } else {
@@ -107,13 +103,14 @@ func (crypto *Crypto) CreateDecoderStream(clientKey []byte, clientStreamHeader [
 func (crypto *Crypto) Encrypt(bytes []byte) []byte { // nillable result
     bytesSize := uint(len(bytes))
     utils.Assert(bytesSize > 0 && crypto.encoder != nil && crypto.decoder != nil)
+    encryptedSize := EncryptedSize(bytesSize)
 
     writtenCount, err := crypto.encoder.Write(bytes)
-    if writtenCount != int(bytesSize) || err != nil { return nil }
+    if writtenCount != int(encryptedSize) || err != nil { return nil }
 
-    encrypted := make([]byte, EncryptedSize(bytesSize))
+    encrypted := make([]byte, encryptedSize)
     writtenCount, err = crypto.encoderBuffer.Read(encrypted)
-    if writtenCount != int(bytesSize) || err != nil { return nil }
+    if writtenCount != int(encryptedSize) || err != nil { return nil }
 
     return encrypted
 }
@@ -125,7 +122,7 @@ func (crypto *Crypto) Decrypt(bytes []byte) []byte {
 
     decrypted := make([]byte, bytesSize)
     writtenCount, err := crypto.decoder.Read(decrypted)
-    if writtenCount != int(bytesSize - encryptedAdditionalBytesSize) || err != nil { fmt.Println(bytesSize, writtenCount, err); return nil }
+    if writtenCount != int(bytesSize - encryptedAdditionalBytesSize) || err != nil { return nil }
 
     return decrypted
 }

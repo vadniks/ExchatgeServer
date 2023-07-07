@@ -5,7 +5,6 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/idsPool"
     "ExchatgeServer/utils"
-    "fmt"
     goNet "net"
     goSync "sync"
     "sync/atomic"
@@ -194,11 +193,6 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
         return
     }
 
-    fmt.Println("server public key", net.serverPublicKey)
-    fmt.Println("client public key", clientPublicKey)
-    fmt.Println("server header", serverStreamHeader)
-    fmt.Println("client header", clientStreamHeader)
-
     addNewConnection(connectionId, connection, xCrypto)
 
     messageBuffer := make([]byte, net.messageBufferSize)
@@ -230,7 +224,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
 }
 
 func send(connection *goNet.Conn, payload []byte) {
-    utils.Assert(connection != nil && len(payload) > 0) // TODO: now it fails here
+    utils.Assert(connection != nil && len(payload) > 0)
     count, err := (*connection).Write(payload)
     utils.Assert(count == len(payload) && err == nil)
 }
