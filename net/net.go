@@ -201,7 +201,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
 
         if receive(connection, messageBuffer, &disconnected) { // TODO: add timeout for an opened connection and limit connection count
             switch processClientMessage(connectionId, messageBuffer) {
-                case flagFinishToReconnect: fallthrough // --& --x-- falling through until I decide what to do with them
+                case flagFinishToReconnect: fallthrough
                 case flagFinishWithError: fallthrough
                 case flagFinish:
                     closeConnection(false)
@@ -210,7 +210,11 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
                     closeConnection(false)
                     (*onShutDownRequested)()
                     return
-                case flagProceed: fallthrough // --x--
+                case flagProceed: fallthrough
+                case flagExchangeKeys: fallthrough
+                case flagExchangeKeysDone: fallthrough
+                case flagExchangeHeaders: fallthrough
+                case flagExchangeHeadersDone: fallthrough
                 case flagError: fallthrough
                 case flagSuccess: func(){}()
             }
