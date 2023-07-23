@@ -15,6 +15,6 @@ server's identity via digital signature.
 Server is written entirely in Go. 
 The following libraries are used: Sodium, Mongo-driver.
 
-## The project is in development stage
+## The project is currently in `Beta` stage
 
 [The client](https://github.com/vadniks/ExchatgeDesktopClient)
