@@ -8,10 +8,13 @@ services:
     volumes:
       - ./db:/data/db
     healthcheck:
-      test: ["CMD", "mongo", "mongodb://localhost:27017"]
+      test: ["CMD", "mongo", "mongodb://root:root@mongodb:27017/admin"]
       interval: 5s
       timeout: 5s
       retries: 2
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
     container_name: exchatge_mongo
   server:
     build: .

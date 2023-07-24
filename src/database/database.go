@@ -27,10 +27,11 @@ import (
     "go.mongodb.org/mongo-driver/mongo"
     "go.mongodb.org/mongo-driver/mongo/options"
     "reflect"
+    "strings"
 )
 
-const mongoUrl = "mongodb://mongodb:27017/exchatge"
-const databaseName = "db"
+const mongoUrl = "mongodb://root:root@mongodb:27017"
+const databaseName = "admin"
 const collectionUsers = "users"
 
 const fieldRealId = "_id"
@@ -89,14 +90,27 @@ func loadIds() {
     }
 }
 
-func Destroy() { utils.Assert(this.client.Disconnect(*(this.ctx)) == nil) }
+func Destroy() {
+    result := this.client.Database(databaseName).RunCommand(*(this.ctx), bson.D{{"shutdown", 1}})
+
+    utils.Assert(
+        result != nil &&
+        result.Err() != nil &&
+        strings.Contains(result.Err().Error(), "socket was unexpectedly closed: EOF"),
+    )
+
+    utils.Assert(this.client.Disconnect(*(this.ctx)) == nil)
+}
 
 func addAdminIfNotExists() { // admin is the only user that has id equal to 0
+    id := availableUserId()
+    utils.Assert(id != nil && *id == uint32(0))
+
     if result := this.collection.FindOne(
         *(this.ctx),
         bson.D{{fieldId, 0}, {fieldName, this.adminUsername}},
     ); result.Err() == mongo.ErrNoDocuments {
-        _, err := this.collection.InsertOne(*(this.ctx), User{Id: 0, Name: this.adminUsername, Password: this.adminPassword})
+        _, err := this.collection.InsertOne(*(this.ctx), User{Id: *id, Name: this.adminUsername, Password: this.adminPassword})
         utils.Assert(err == nil)
     }
 }
