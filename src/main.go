@@ -24,11 +24,17 @@ import (
 )
 
 func main() {
-    println("started...")
+    println("Exchatge server started...")
+
     database.Init(net.MaxUsersCount)
     println("connected to the database...")
+
     net.Initialize()
     println("initialized; running")
+
     net.ProcessClients()
+
+    println("shutting down...")
     database.Destroy()
+    println("Exiting now...")
 }
