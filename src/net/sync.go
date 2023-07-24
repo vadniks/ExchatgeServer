@@ -26,7 +26,8 @@ const flagExchangeKeys = 0x000000a0
 const flagExchangeKeysDone = 0x000000b0
 const flagExchangeHeaders = 0x000000c0
 const flagExchangeHeadersDone = 0x000000d0
-const flagFile = 0x000000e0
+const flagFileAsk = 0x000000e0
+const flagFile = 0x000000f0
 const flagShutdown int32 = 0x7fffffff
 
 const toAnonymous uint32 = 0x7fffffff
