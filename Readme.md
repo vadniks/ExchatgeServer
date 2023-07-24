@@ -11,6 +11,9 @@ can easily communicate with each other.
 Connection between user and server is end-to-end encrypted and client can verify 
 server's identity via digital signature.
 
+## `TODO`
+* Add messages queues for users to store messages in them while users are offline to allow them fetch messages later
+
 ## Dependencies
 
 Server is written entirely in Go. 
