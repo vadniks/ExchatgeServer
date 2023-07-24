@@ -29,7 +29,7 @@ import (
     "reflect"
 )
 
-const mongoUrl = "mongodb://127.0.0.1:27017/exchatge"
+const mongoUrl = "mongodb://mongodb:27017/exchatge"
 const databaseName = "db"
 const collectionUsers = "users"
 

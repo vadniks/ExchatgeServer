@@ -7,6 +7,20 @@ services:
       - '27017:27017'
     volumes:
       - ./db:/data/db
+    healthcheck:
+      test: ["CMD", "mongo", "mongodb://localhost:27017"]
+      interval: 5s
+      timeout: 5s
+      retries: 2
     container_name: exchatge_mongo
+  server:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mongodb
+    links:
+      - mongodb
+    container_name: exchatge_server
 volumes:
   db:

@@ -28,7 +28,7 @@ import (
     "unsafe"
 )
 
-const host = "localhost:8080"
+const host = "0.0.0.0:8080"
 
 const intSize = 4
 const longSize = 8

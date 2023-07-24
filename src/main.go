@@ -24,8 +24,11 @@ import (
 )
 
 func main() {
+    println("started...")
     database.Init(net.MaxUsersCount)
+    println("connected to the database...")
     net.Initialize()
+    println("initialized; running")
     net.ProcessClients()
     database.Destroy()
 }
