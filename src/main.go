@@ -21,10 +21,24 @@ package main
 import (
     "ExchatgeServer/database"
     "ExchatgeServer/net"
+    "ExchatgeServer/utils"
+    "os"
+    "os/exec"
+    "strings"
 )
 
 func main() {
     println("Exchatge server started...")
+
+    cmd := exec.Command("curl", "-f", "mongodb:27017")
+    utils.Assert(cmd.Err == nil)
+    out, err := cmd.Output()
+
+    if err != nil || !strings.Contains(string(out), "MongoDB") {
+        println("cannot connect to the database, exiting...")
+        os.Exit(1)
+        return
+    }
 
     database.Init(net.MaxUsersCount)
     println("connected to the database...")
