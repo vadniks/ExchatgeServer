@@ -50,8 +50,6 @@ func (user *User) passwordHashed() *User {
     return user
 }
 
-// TODO: store each conversation's encryption key on client's side for each client, store Name of each participant of each conversation on the client side
-
 type database struct {
     ctx *context.Context
     collection *mongo.Collection
