@@ -60,7 +60,7 @@ type database struct {
 }
 var this *database = nil
 
-func Init(maxUsersCount uint32) { // TODO: authenticate database connection with password
+func Init(maxUsersCount uint32) {
     ctx := context.TODO()
 
     client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoUrl))
