@@ -162,7 +162,11 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
 
     sync.mutex.Lock()
     user := database.FindUser(username, unhashedPassword)
-    if user == nil {
+
+    var connectedUser *database.User = nil
+    if user != nil { _, connectedUser = findConnectUser(user.Id) }
+
+    if user == nil || connectedUser != nil {
         sync.mutex.Unlock()
         sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
         finishRequested(connectionId)
@@ -297,7 +301,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
             msg.to == toServer,
         )
 
-        setConnectionState(connectionId,stateSecureConnectionEstablished)
+        setConnectionState(connectionId, stateSecureConnectionEstablished)
     } else {
         utils.Assert(
             *state > 0 &&
