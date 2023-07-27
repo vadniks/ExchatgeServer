@@ -23,6 +23,7 @@ import (
     "ExchatgeServer/database"
     "ExchatgeServer/utils"
     goNet "net"
+    goSync "sync"
 )
 
 type connectedUser struct {
@@ -34,20 +35,28 @@ type connectedUser struct {
 
 type connectionsT struct {
     connectedUsers map[uint32/*connectionId*/]*connectedUser // nillable values
+    mutex goSync.Mutex
 }
-var connections = &connectionsT{make(map[uint32]*connectedUser)}
+var connections = &connectionsT{make(map[uint32]*connectedUser), goSync.Mutex{}}
 
 func addNewConnection(connectionId uint32, connection *goNet.Conn, xxCrypto *xCrypto.Crypto) {
+    connections.mutex.Lock()
+
     connections.connectedUsers[connectionId] = &connectedUser{
         connection: connection,
         crypto: xxCrypto,
         user: nil,
         state: stateConnected,
     }
+
+    connections.mutex.Unlock()
 }
 
 func getConnectedUser(connectionId uint32) *connectedUser { // nillable result
+    connections.mutex.Lock()
     value, ok := connections.connectedUsers[connectionId]
+    connections.mutex.Unlock()
+
     if ok {
         utils.Assert(value != nil)
         return value
@@ -105,16 +114,25 @@ func getConnectedUserId(connectionId uint32) *uint32 { // nillable result
 }
 
 func findConnectUser(userId uint32) (uint32, *database.User) { // nillable second result
+    connections.mutex.Lock()
+
     for connectionId, connectedUser := range connections.connectedUsers {
         utils.Assert(connectedUser != nil)
-        if user := connectedUser.user; user != nil && user.Id == userId { return connectionId, user }
+        if user := connectedUser.user; user != nil && user.Id == userId {
+            connections.mutex.Unlock()
+            return connectionId, user
+        }
     }
+
+    connections.mutex.Unlock()
     return 0, nil
 }
 
 func deleteConnection(connectionId uint32) bool { // returns true on success
     if xConnectedUser := getConnectedUser(connectionId); xConnectedUser != nil {
+        connections.mutex.Lock()
         delete(connections.connectedUsers, connectionId)
+        connections.mutex.Unlock()
         return true
     } else {
         return false

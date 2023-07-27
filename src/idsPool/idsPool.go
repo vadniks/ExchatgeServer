@@ -22,17 +22,30 @@ import (
     "ExchatgeServer/utils"
     "math"
     "math/big"
+    "sync"
     "unsafe"
 )
 
 type IdsPool struct {
     size uint32
     ids big.Int
+    mutex sync.Mutex
 }
 
+var xFalse, xTrue = func() (byte, byte) { // returns 0, 1 (false, true)
+    xFalse := false
+    xxFalse := *((*byte) (unsafe.Pointer(&xFalse)))
+    utils.Assert(xxFalse == byte(0))
+
+    xTrue := 1
+    xxTrue := *((*byte) (unsafe.Pointer(&xTrue)))
+    utils.Assert(xxTrue == byte(1))
+
+    return xxFalse, xxTrue
+}()
+
 func InitIdsPool(size uint32) *IdsPool { // bitset, aka map[uint32/*id*/]bool/*taken*/
-    xFalse, _ := bools()
-    xIds := &IdsPool{size, big.Int{}}
+    xIds := &IdsPool{size, big.Int{}, sync.Mutex{}}
 
     xIds.ids.SetBit(&(xIds.ids), int(size), 1)
 
@@ -44,38 +57,35 @@ func InitIdsPool(size uint32) *IdsPool { // bitset, aka map[uint32/*id*/]bool/*t
     return xIds
 }
 
-func bools() (byte, byte) { // returns 0, 1 (false, true)
-    xFalse := false
-    xxFalse := *((*byte) (unsafe.Pointer(&xFalse)))
-    utils.Assert(xxFalse == byte(0))
-
-    xTrue := 1
-    xxTrue := *((*byte) (unsafe.Pointer(&xTrue)))
-    utils.Assert(xxTrue == byte(1))
-
-    return xxFalse, xxTrue
-}
-
 func (pool *IdsPool) SetId(id uint32, taken bool) {
-    xFalse, xTrue := bools()
+    pool.mutex.Lock()
+
     utils.Assert(id < pool.size)
     pool.ids.SetBit(&(pool.ids), int(id), uint(func() byte { if taken { return xTrue } else { return xFalse } }()))
+
+    pool.mutex.Unlock()
 }
 
 func (pool *IdsPool) TakeId() *uint32 { // nillable result
-    xFalse, xTrue := bools()
+    pool.mutex.Lock()
 
     for i := uint32(0); i < pool.size; i++ {
         if pool.ids.Bit(int(i)) == uint(xFalse) {
             pool.ids.SetBit(&(pool.ids), int(i), uint(xTrue))
+            pool.mutex.Unlock()
             return &i
         }
     }
+
+    pool.mutex.Unlock()
     return nil
 }
 
 func (pool *IdsPool) ReturnId(id uint32) {
-    xFalse, xTrue := bools()
+    pool.mutex.Lock()
+
     utils.Assert(id < pool.size && pool.ids.Bit(int(id)) == uint(xTrue))
     pool.ids.SetBit(&(pool.ids), int(id), uint(xFalse))
+
+    pool.mutex.Unlock()
 }

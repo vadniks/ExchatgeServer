@@ -28,6 +28,7 @@ import (
     "go.mongodb.org/mongo-driver/mongo/options"
     "reflect"
     "strings"
+    "sync"
 )
 
 const mongoUrl = "mongodb://root:root@mongodb:27017"
@@ -57,6 +58,7 @@ type database struct {
     adminUsername []byte
     adminPassword []byte
     idsPool *xIdsPool.IdsPool
+    mutex sync.Mutex
 }
 var this *database = nil
 
@@ -74,11 +76,11 @@ func Init(maxUsersCount uint32) {
         []byte{'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
         crypto.Hash([]byte{'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}),
         xIdsPool.InitIdsPool(maxUsersCount),
+        sync.Mutex{},
     }
 
     addAdminIfNotExists()
     mocData() // TODO: test only
-
     loadIds()
 }
 
@@ -89,6 +91,7 @@ func loadIds() {
 }
 
 func Destroy() {
+    this.mutex.Lock()
     result := this.client.Database(databaseName).RunCommand(*(this.ctx), bson.D{{"shutdown", 1}})
 
     utils.Assert(
@@ -98,6 +101,7 @@ func Destroy() {
     )
 
     utils.Assert(this.client.Disconnect(*(this.ctx)) == nil)
+    this.mutex.Unlock()
 }
 
 func addAdminIfNotExists() { // admin is the only user that has id equal to 0
@@ -126,7 +130,10 @@ func IsAdmin(user *User) bool { return user.Id == 0 } // as users are being veri
 func FindUser(username []byte, unhashedPassword []byte) *User { // nillable result
     utils.Assert(len(username) > 0 && len(unhashedPassword) > 0)
 
+    this.mutex.Lock()
     result := this.collection.FindOne(*(this.ctx), bson.D{{fieldName, username}})
+    this.mutex.Unlock()
+
     if result.Err() != nil { return nil }
 
     if user := new(User); result.Decode(user) == nil {
@@ -146,14 +153,25 @@ func availableUserId() *uint32 { return this.idsPool.TakeId() }
 
 func AddUser(username []byte, hashedPassword []byte) *User { // nillable result
     utils.Assert(len(username) > 0 && len(hashedPassword) == int(crypto.HashSize))
-    if usernameAlreadyInUse(username) { return nil }
+    this.mutex.Lock()
+
+    if usernameAlreadyInUse(username) {
+        this.mutex.Unlock()
+        return nil
+    }
 
     userId := availableUserId()
-    if userId == nil { return nil }
+    if userId == nil {
+        this.mutex.Unlock()
+        return nil
+    }
     utils.Assert(*userId > 0)
 
     result, err := this.collection.InsertOne(*(this.ctx), User{Id: *userId, Name: username, Password: hashedPassword})
-    if result == nil || err != nil { return nil }
+    if result == nil || err != nil {
+        this.mutex.Unlock()
+        return nil
+    }
 
     result2 := this.collection.FindOne(*(this.ctx), bson.D{{fieldRealId, result.InsertedID}})
     utils.Assert(result2.Err() == nil)
@@ -161,11 +179,16 @@ func AddUser(username []byte, hashedPassword []byte) *User { // nillable result
     user := new(User)
     utils.Assert(result2.Decode(user) == nil)
     utils.Assert(user.Id > 0 && reflect.DeepEqual(username, user.Name) && reflect.DeepEqual(hashedPassword, user.Password))
+
+    this.mutex.Unlock()
     return user
 }
 
 func GetAllUsers() []User {
+    this.mutex.Lock()
     cursor, err := this.collection.Find(*(this.ctx), bson.D{})
+    this.mutex.Unlock()
+
     utils.Assert(err == nil)
 
     var users []User
@@ -174,7 +197,10 @@ func GetAllUsers() []User {
 }
 
 func GetUsersCount() uint32 {
+    this.mutex.Lock()
     count, err := this.collection.EstimatedDocumentCount(*(this.ctx))
+    this.mutex.Unlock()
+
     utils.Assert(err == nil)
     return uint32(count)
 }
