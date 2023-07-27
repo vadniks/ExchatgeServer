@@ -110,14 +110,16 @@ func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
     return result
 }
 
-func shutdownRequested(connectionId uint32, user *database.User, msg *message) int32 {
+func shutdownRequested(connectionId uint32, user *database.User, msg *message) int32 { // TODO: add more administrative actions, such as: logging in and registration blocking, user ban...
     utils.Assert(user != nil && msg.to == toServer)
 
-    sync.mutex.Lock()
     if database.IsAdmin(user) {
         finishRequested(connectionId)
+
+        sync.mutex.Lock()
         sync.shuttingDown = true
         sync.mutex.Unlock()
+
         return flagShutdown
     } else {
         sync.mutex.Unlock()
