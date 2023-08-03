@@ -25,6 +25,12 @@ The following libraries are used:
 
 [The client](https://github.com/vadniks/ExchatgeDesktopClient)
 
+## Deploy
+
+Just run `docker-compose up --build` from the root directory of this repository. 
+Ensure that you have `docker` & `docker-compose` programs installed. Build is 
+performed automatically while creating the container.
+
 ## License
 
 GNU GPLv3 - to keep the source code open
