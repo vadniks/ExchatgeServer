@@ -25,6 +25,20 @@ The following libraries are used:
 
 [The client](https://github.com/vadniks/ExchatgeDesktopClient)
 
+## Build
+
+Firstly, the LibSodium library is needed to be installed, example for Fedora:
+```shell
+sudo dnf install libsodium libsodium-devel
+```
+Secondly, the project dependencies are needed to be installed, and then, 
+the actual build can be performed:
+```shell
+# should be executed from the repository's root directory
+(cd src; go get)
+go build -C src -o "$(pwd)/build/ExchatgeServer" ExchatgeServer
+```
+
 ## Deploy
 
 Just run `docker-compose up --build` from the root directory of this repository. 
