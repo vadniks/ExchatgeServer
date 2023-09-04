@@ -35,12 +35,20 @@ type connectedUser struct {
 
 type connectionsT struct {
     connectedUsers map[uint32/*connectionId*/]*connectedUser // nillable values
+    ids map[uint32/*userId*/]*uint32/*connectionId*/ // nillable values
     mutex goSync.Mutex
 }
-var connections = &connectionsT{make(map[uint32]*connectedUser), goSync.Mutex{}}
+var connections = &connectionsT{
+    make(map[uint32]*connectedUser),
+    make(map[uint32]*uint32),
+    goSync.Mutex{},
+}
 
 func addNewConnection(connectionId uint32, connection *goNet.Conn, xxCrypto *xCrypto.Crypto) {
     connections.mutex.Lock()
+
+    _, ok := connections.connectedUsers[connectionId]
+    utils.Assert(!ok)
 
     connections.connectedUsers[connectionId] = &connectedUser{
         connection: connection,
@@ -99,12 +107,21 @@ func getUser(connectionId uint32) *database.User { // nillable result
 }
 
 func setUser(connectionId uint32, user *database.User) bool { // returns true on success
-    if xConnectedUser := getConnectedUser(connectionId); xConnectedUser != nil {
-        xConnectedUser.user = user
-        return true
-    } else {
-        return false
-    }
+    connectedUser := getConnectedUser(connectionId)
+    if connectedUser == nil { return false }
+    connections.mutex.Lock()
+
+    connectedUser.user = user
+
+    _, ok := connections.ids[user.Id]
+    utils.Assert(!ok)
+
+    xConnectionId := new(uint32)
+    *xConnectionId = connectionId
+    connections.ids[user.Id] = xConnectionId
+
+    connections.mutex.Unlock()
+    return true
 }
 
 func getConnectedUserId(connectionId uint32) *uint32 { // nillable result
@@ -113,28 +130,32 @@ func getConnectedUserId(connectionId uint32) *uint32 { // nillable result
     return &(user.Id)
 }
 
-func findConnectUser(userId uint32) (uint32, *database.User) { // nillable second result
+func getAuthorizedConnectedUser(userId uint32) (uint32, *database.User) { // nillable second result
     connections.mutex.Lock()
-
-    for connectionId, connectedUser := range connections.connectedUsers {
-        utils.Assert(connectedUser != nil)
-        if user := connectedUser.user; user != nil && user.Id == userId {
-            connections.mutex.Unlock()
-            return connectionId, user
-        }
-    }
-
+    connectionId := connections.ids[userId]
     connections.mutex.Unlock()
-    return 0, nil
+
+    if connectionId == nil { return 0, nil }
+
+    connectedUser, ok := connections.connectedUsers[*connectionId]
+    if !ok { return 0, nil }
+
+    if user := connectedUser.user; user == nil {
+        return 0, nil
+    } else {
+        return *connectionId, connectedUser.user
+    }
 }
 
 func deleteConnection(connectionId uint32) bool { // returns true on success
-    if xConnectedUser := getConnectedUser(connectionId); xConnectedUser != nil {
-        connections.mutex.Lock()
-        delete(connections.connectedUsers, connectionId)
-        connections.mutex.Unlock()
-        return true
-    } else {
-        return false
-    }
+    connectedUser := getConnectedUser(connectionId)
+    if connectedUser == nil { return false }
+
+    connections.mutex.Lock()
+
+    delete(connections.connectedUsers, connectionId)
+    if user := connectedUser.user; user != nil { delete(connections.ids, user.Id) }
+
+    connections.mutex.Unlock()
+    return true
 }

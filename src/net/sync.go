@@ -132,7 +132,7 @@ func shutdownRequested(connectionId uint32, user *database.User, msg *message) i
 func proceedRequested(msg *message) int32 {
     utils.Assert(msg != nil && msg.to != msg.from)
 
-    if toUserConnectionId, toUser := findConnectUser(msg.to); toUser != nil {
+    if toUserConnectionId, toUser := getAuthorizedConnectedUser(msg.to); toUser != nil {
         sendMessage(toUserConnectionId, msg)
     } else {
         // TODO: user offline or doesn't exist
@@ -166,7 +166,7 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
     user := database.FindUser(username, unhashedPassword)
 
     var connectedUser *database.User = nil
-    if user != nil { _, connectedUser = findConnectUser(user.Id) }
+    if user != nil { _, connectedUser = getAuthorizedConnectedUser(user.Id) }
 
     if user == nil || connectedUser != nil {
         sync.mutex.Unlock()
@@ -228,7 +228,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
 
     var infosCount uint32 = 0
     for _, user := range registeredUsers {
-        _, xUser := findConnectUser(user.Id)
+        _, xUser := getAuthorizedConnectedUser(user.Id)
 
         xUserInfo := &userInfo{
             id: user.Id,
