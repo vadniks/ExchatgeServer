@@ -191,7 +191,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
     send(connection, crypto.Sign(net.serverPublicKey))
 
     clientPublicKey := make([]byte, crypto.KeySize)
-    utils.Assert(receive(connection, clientPublicKey, nil))
+    utils.Assert(receive(connection, clientPublicKey, nil)) // TODO: replace assert with connection drop here so clients cannot brake the server
 
     serverKey, clientKey := crypto.ExchangeKeys(net.serverPublicKey, net.serverSecretKey, clientPublicKey)
     if serverKey == nil || clientKey == nil {

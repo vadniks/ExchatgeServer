@@ -65,7 +65,7 @@ type syncT struct {
     tokenAnonymous []byte
     tokenServer [crypto.TokenSize]byte
     bodyStub [messageBodySize]byte
-    mutex goSync.Mutex
+    rwMutex goSync.RWMutex
     shuttingDown bool
 }
 
@@ -73,7 +73,7 @@ var sync = &syncT{
     make([]byte, crypto.TokenSize), // all zeroes
     crypto.MakeServerToken(messageBodySize),
     [messageBodySize]byte{}, // all zeroes,
-    goSync.Mutex{},
+    goSync.RWMutex{},
     false,
 }
 
@@ -116,13 +116,12 @@ func shutdownRequested(connectionId uint32, user *database.User, msg *message) i
     if database.IsAdmin(user) {
         finishRequested(connectionId)
 
-        sync.mutex.Lock()
+        sync.rwMutex.Lock()
         sync.shuttingDown = true
-        sync.mutex.Unlock()
+        sync.rwMutex.Unlock()
 
         return flagShutdown
     } else {
-        sync.mutex.Unlock()
         sendMessage(connectionId, simpleServerMessage(flagAccessDenied, user.Id))
         return flagProceed
     }
@@ -162,14 +161,14 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
         passwordSize > 0 && passwordSize <= unhashedPasswordSize,
     )
 
-    sync.mutex.Lock()
+    sync.rwMutex.Lock()
     user := database.FindUser(username, unhashedPassword)
 
     var connectedUser *database.User = nil
     if user != nil { _, connectedUser = getAuthorizedConnectedUser(user.Id) }
 
     if user == nil || connectedUser != nil {
-        sync.mutex.Unlock()
+        sync.rwMutex.Unlock()
         sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
         finishRequested(connectionId)
         return flagFinishWithError
@@ -179,7 +178,7 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
     setConnectionState(connectionId, stateLoggedWithCredentials)
 
     token := crypto.MakeToken(connectionId, user.Id) // won't compile if inline the variable
-    sync.mutex.Unlock()
+    sync.rwMutex.Unlock()
     sendMessage(connectionId, serverMessage(flagLoggedIn, user.Id, token[:])) // here's how a client obtains his id
     return flagProceed
 }
@@ -187,9 +186,9 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
 func registrationWithCredentialsRequested(connectionId uint32, msg *message) int32 {
     utils.Assert(msg != nil)
 
-    sync.mutex.Lock()
+    sync.rwMutex.Lock()
     if database.GetUsersCount() >= MaxUsersCount {
-        sync.mutex.Unlock()
+        sync.rwMutex.Unlock()
         sendMessage(connectionId, simpleServerMessage(flagError, toAnonymous))
         finishRequested(connectionId)
         return flagFinishWithError
@@ -199,7 +198,7 @@ func registrationWithCredentialsRequested(connectionId uint32, msg *message) int
     user := database.AddUser(username, crypto.Hash(unhashedPassword))
     successful := user != nil
 
-    sync.mutex.Unlock()
+    sync.rwMutex.Unlock()
     sendMessage(connectionId, simpleServerMessage( // Lack of ternary operator is awful
         func() int32 { if successful { return flagRegistered } else { return flagError } }(),
         func() uint32 { if successful { return user.Id } else { return toAnonymous } }(),
@@ -210,15 +209,15 @@ func registrationWithCredentialsRequested(connectionId uint32, msg *message) int
 }
 
 func finishRequested(connectionId uint32) int32 {
-    sync.mutex.Lock()
+    sync.rwMutex.Lock()
     deleteConnection(connectionId)
-    sync.mutex.Unlock()
+    sync.rwMutex.Unlock()
     return flagFinish
 }
 
 //goland:noinspection GoRedundantConversion
 func usersListRequested(connectionId uint32, userId uint32) int32 {
-    sync.mutex.Lock()
+    sync.rwMutex.RLock()
     registeredUsers := database.GetAllUsers()
     var userInfosBytes []byte
 
@@ -279,7 +278,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
         sendMessage(connectionId, msg)
     }
 
-    sync.mutex.Unlock()
+    sync.rwMutex.RUnlock()
     return flagProceed
 }
 
@@ -288,7 +287,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     flag := msg.flag
     xConnectionId, userIdFromToken := crypto.OpenToken(msg.token)
 
-    sync.mutex.Lock()
+    sync.rwMutex.Lock()
 
     state := getConnectionState(connectionId)
     utils.Assert(state != nil)
@@ -313,7 +312,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
         )
 
         if xConnectionId == nil || userIdFromToken == nil || *xConnectionId != connectionId || *userIdFromToken != *userId {
-            sync.mutex.Unlock()
+            sync.rwMutex.Unlock()
 
             sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
             finishRequested(connectionId)
@@ -321,14 +320,14 @@ func routeMessage(connectionId uint32, msg *message) int32 {
         }
     }
 
-    if sync.shuttingDown {
-        sync.mutex.Unlock()
+    shuttingDown := sync.shuttingDown
+    sync.rwMutex.Unlock()
 
+    if shuttingDown {
         sendMessage(connectionId, simpleServerMessage(flagError, *userId))
         finishRequested(connectionId)
         return flagFinishWithError
     }
-    sync.mutex.Unlock()
 
     switch flag {
         case flagShutdown:
