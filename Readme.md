@@ -41,7 +41,7 @@ go build -C src -o "$(pwd)/build/ExchatgeServer" ExchatgeServer
 
 ## Deploy
 
-Just run `docker-compose up --build` from the root directory of this repository. 
+Just run `docker-compose up --build --abort-on-container-exit` from the root directory of this repository. 
 Ensure that you have `docker` & `docker-compose` programs installed. Build is 
 performed automatically while creating the container.
 
