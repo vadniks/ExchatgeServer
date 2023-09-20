@@ -20,6 +20,7 @@ package options
 
 import (
     "os"
+    "path/filepath"
     "strconv"
     "strings"
 )
@@ -45,7 +46,9 @@ type Options struct {
 }
 
 func Init(secretKeySize uint, maxPasswordSize uint) *Options { // nillable // TODO: replace nillable values with self-made optionals
-    bytes, err := os.ReadFile(fileName)
+    exe, _ := os.Executable()
+    
+    bytes, err := os.ReadFile(filepath.Dir(exe) + "/" + fileName)
     if len(bytes) == 0 || err != nil { return nil }
 
     lines := strings.Split(string(bytes), "\n")
