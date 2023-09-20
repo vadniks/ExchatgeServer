@@ -36,6 +36,7 @@ const intSize = 4
 const tokenUnencryptedValueSize = 2 * intSize // 8
 const tokenTrailingSize uint = 16
 const TokenSize = tokenUnencryptedValueSize + 40 + tokenTrailingSize // 48 + 16 = 64 = 2 encrypted ints + mac + nonce + missing bytes to reach signatureSize so the server can tokenize itself via signature whereas for clients server encrypts 2 ints (connectionId, userId)
+const SecretKeySize = SignatureSize
 
 type Crypto struct {
     encoderBuffer *xBytes.Buffer

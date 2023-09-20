@@ -20,42 +20,116 @@ package options
 
 import (
     "os"
+    "strconv"
     "strings"
 )
 
 const (
     fileName = "options.txt"
-    host = "host"
-    port = "port"
-    maxUsersCount = "maxUsersCount"
-    serverPrivateSignKey = "serverPrivateSignKey"
-    mongodbUrl = "mongodbUrl"
-    adminPassword = "adminPassword"
+    host = "Host"
+    port = "Port"
+    maxUsersCount = "MaxUsersCount"
+    serverPrivateSignKey = "ServerPrivateSignKey"
+    mongodbUrl = "MongodbUrl"
+    adminPassword = "AdminPassword"
     linesCount = 6
 )
 
-type optionsT struct {
-    host string
-    port uint
-    maxUsersCount uint
-    serverPrivateSignKey []byte
-    mongodbUrl string
-    adminPassword []byte
+type Options struct {
+    Host string
+    Port uint
+    MaxUsersCount uint
+    ServerPrivateSignKey []byte
+    MongodbUrl string
+    AdminPassword []byte // TODO: fill with random bytes after use
 }
 
-func Init() bool { // nillable // TODO: replace nillable values with self-made optionals
+func Init(secretKeySize uint, maxPasswordSize uint) *Options { // nillable // TODO: replace nillable values with self-made optionals
     bytes, err := os.ReadFile(fileName)
-    if len(bytes) == 0 || err != nil { return false }
+    if len(bytes) == 0 || err != nil { return nil }
 
-    lines := strings.Split(string(bytes), string('\n'))
-    if len(lines) != linesCount { return false }
+    lines := strings.Split(string(bytes), "\n")
+    if len(lines) != linesCount { return nil }
 
-    parseHost(lines[0])
+    options := &Options{
+        Host: "",
+        Port: 0,
+        MaxUsersCount: 0,
+        ServerPrivateSignKey: nil,
+        MongodbUrl: "",
+        AdminPassword: nil,
+    }
 
-    return true
+    for _, line := range lines {
+        parts := strings.Split(line, "=")
+        value := parts[1]
+
+        switch parts[0] {
+            case host:
+                options.Host = parseHost(value)
+                if len(options.Host) == 0 { return nil }
+            case port:
+                options.Port = parsePort(value)
+                if options.Port == 0 { return nil }
+            case maxUsersCount:
+                options.MaxUsersCount = parseMaxUsersCount(value)
+                if options.MaxUsersCount == 0 { return nil }
+            case serverPrivateSignKey:
+                options.ServerPrivateSignKey = parseServerPrivateSignKey(value, secretKeySize)
+                if len(options.ServerPrivateSignKey) == 0 { return nil }
+            case mongodbUrl:
+                options.MongodbUrl = parseMongodbUrl(value)
+                if len(options.MongodbUrl) == 0 { return nil }
+            case adminPassword:
+                options.AdminPassword = parseAdminPassword(value, maxPasswordSize)
+                if len(options.AdminPassword) == 0 { return nil }
+        }
+    }
+
+    return options
 }
 
-func parseHost(text string) (string, bool) {
+func parseHost(value string) string { return value }
 
-    return "", false
+func parseUint(str string) uint {
+    xInt, err := strconv.Atoi(str)
+    if err != nil || xInt < 0 { return 0 }
+    return uint(xInt)
+}
+
+func parsePort(value string) uint { return parseUint(value) }
+func parseMaxUsersCount(value string) uint { return parseUint(value) }
+
+func parseServerPrivateSignKey(value string, secretKeySize uint) []byte { // nillable
+    bytes := make([]byte, secretKeySize)
+
+    count := 0
+    for index, number := range strings.Split(value, ",") {
+        bytes[index] = byte(parseUint(number))
+        count++
+    }
+
+    if uint(count) != secretKeySize {
+        return nil
+    } else {
+        return bytes
+    }
+}
+
+func parseMongodbUrl(value string) string { return value }
+
+func parseAdminPassword(value string, maxPasswordSize uint) []byte { // nillable
+    bytes := make([]byte, maxPasswordSize)
+
+    count := 0
+    for index, number := range strings.Split(value, ",") {
+        bytes[index] = byte(parseUint(number))
+        count++
+    }
+
+    if uint(count) != maxPasswordSize {
+        return nil
+    } else {
+        return bytes
+    }
 }
