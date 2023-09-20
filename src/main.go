@@ -30,6 +30,12 @@ import (
 )
 
 func main() {
+    print("\033[1;32m" +
+    "_______ _     _ _______ _     _ _______ _______  ______ _______\n" +
+    "|______  \\___/  |       |_____| |_____|    |    |  ____ |______\n" +
+    "|______ _/   \\_ |_____  |     | |     |    |    |_____| |______\n" +
+    "                   free software (GNU GPL v3)                   \033[0m\n")
+
     println("Exchatge server started...")
 
     cmd := exec.Command("curl", "-f", "mongodb:27017")
