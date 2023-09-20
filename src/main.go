@@ -38,19 +38,19 @@ func main() {
 
     println("Exchatge server started...")
 
-    cmd := exec.Command("curl", "-f", "mongodb:27017")
+    xOptions := options.Init(crypto.SecretKeySize, net.UnhashedPasswordSize)
+    if xOptions == nil {
+        println("unable to parse options, exiting...")
+        os.Exit(1)
+        return
+    }
+
+    cmd := exec.Command("curl", "-f", strings.Split(xOptions.MongodbUrl, "@")[1])
     utils.Assert(cmd.Err == nil)
     out, err := cmd.Output()
 
     if err != nil || !strings.Contains(string(out), "MongoDB") {
         println("cannot connect to the database, exiting...")
-        os.Exit(1)
-        return
-    }
-
-    xOptions := options.Init(crypto.SecretKeySize, net.UnhashedPasswordSize)
-    if xOptions == nil {
-        println("unable to parse options, exiting...")
         os.Exit(1)
         return
     }
