@@ -124,13 +124,13 @@ func parseMongodbUrl(value string) string { return value }
 func parseAdminPassword(value string, maxPasswordSize uint) []byte { // nillable
     bytes := make([]byte, maxPasswordSize)
 
-    count := 0
+    var count uint = 0
     for index, number := range strings.Split(value, ",") {
         bytes[index] = byte(parseUint(number))
         count++
     }
 
-    if uint(count) != maxPasswordSize {
+    if count > maxPasswordSize || count == 0 {
         return nil
     } else {
         return bytes
