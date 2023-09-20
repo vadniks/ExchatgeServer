@@ -19,8 +19,10 @@
 package main
 
 import (
+    "ExchatgeServer/crypto"
     "ExchatgeServer/database"
     "ExchatgeServer/net"
+    "ExchatgeServer/options"
     "ExchatgeServer/utils"
     "os"
     "os/exec"
@@ -40,13 +42,22 @@ func main() {
         return
     }
 
-    database.Init(net.MaxUsersCount)
+    xOptions := options.Init(crypto.SecretKeySize, net.UnhashedPasswordSize)
+    if xOptions == nil {
+        println("unable to parse options, exiting...")
+        os.Exit(1)
+        return
+    }
+
+    crypto.Initialize(xOptions.ServerPrivateSignKey)
+
+    database.Initialize(uint32(xOptions.MaxUsersCount), xOptions.MongodbUrl, xOptions.AdminPassword)
     println("connected to the database...")
 
-    net.Initialize()
+    net.Initialize(xOptions.MaxUsersCount)
     println("initialized; running")
 
-    net.ProcessClients()
+    net.ProcessClients(xOptions.Host, xOptions.Port)
 
     println("shutting down...")
     database.Destroy()

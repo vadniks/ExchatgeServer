@@ -31,7 +31,6 @@ import (
     "sync"
 )
 
-const mongoUrl = "mongodb://root:root@mongodb:27017"
 const databaseName = "admin"
 const collectionUsers = "users"
 
@@ -62,7 +61,7 @@ type database struct {
 }
 var this *database = nil
 
-func Init(maxUsersCount uint32) {
+func Initialize(maxUsersCount uint32, mongoUrl string, adminPassword []byte) {
     ctx := context.TODO()
 
     client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoUrl))
@@ -74,10 +73,12 @@ func Init(maxUsersCount uint32) {
         collection,
         client,
         []byte{'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-        crypto.Hash([]byte{'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}),
+        crypto.Hash(adminPassword),
         xIdsPool.InitIdsPool(maxUsersCount),
         sync.RWMutex{},
     }
+
+    for i, _ := range adminPassword { adminPassword[i] = 0 }
 
     addAdminIfNotExists()
     mocData() // TODO: test only

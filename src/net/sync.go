@@ -56,12 +56,13 @@ const stateSecureConnectionEstablished uint = 1
 const stateLoggedWithCredentials uint = 2
 
 const usernameSize uint = 16
-const unhashedPasswordSize uint = 16
+const UnhashedPasswordSize uint = 16
 
 const fromAnonymous uint32 = 0xffffffff
 const fromServer uint32 = 0x7fffffff
 
 type syncT struct {
+    maxUsersCount uint32
     tokenAnonymous []byte
     tokenServer [crypto.TokenSize]byte
     bodyStub [messageBodySize]byte
@@ -69,12 +70,17 @@ type syncT struct {
     shuttingDown bool
 }
 
-var sync = &syncT{
-    make([]byte, crypto.TokenSize), // all zeroes
-    crypto.MakeServerToken(messageBodySize),
-    [messageBodySize]byte{}, // all zeroes,
-    goSync.RWMutex{},
-    false,
+var sync *syncT = nil
+
+func syncInitialize(maxUsersCount uint) {
+    sync = &syncT{
+        uint32(maxUsersCount),
+        make([]byte, crypto.TokenSize), // all zeroes
+        crypto.MakeServerToken(messageBodySize),
+        [messageBodySize]byte{}, // all zeroes,
+        goSync.RWMutex{},
+        false,
+    }
 }
 
 func simpleServerMessage(xFlag int32, xTo uint32) *message {
@@ -145,7 +151,7 @@ func parseCredentials(msg *message) (username []byte, unhashedPassword []byte) {
     username = make([]byte, usernameSize)
     copy(username, unsafe.Slice(&(msg.body[0]), usernameSize))
 
-    unhashedPassword = make([]byte, unhashedPasswordSize)
+    unhashedPassword = make([]byte, UnhashedPasswordSize)
     copy(unhashedPassword, unsafe.Slice(&(msg.body[usernameSize]), crypto.HashSize))
 
     return username, unhashedPassword
@@ -158,7 +164,7 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
     xUsernameSize := uint(len(username)); passwordSize := uint(len(unhashedPassword))
     utils.Assert(
         xUsernameSize > 0 && xUsernameSize <= usernameSize &&
-        passwordSize > 0 && passwordSize <= unhashedPasswordSize,
+        passwordSize > 0 && passwordSize <= UnhashedPasswordSize,
     )
 
     sync.rwMutex.Lock()
@@ -187,7 +193,7 @@ func registrationWithCredentialsRequested(connectionId uint32, msg *message) int
     utils.Assert(msg != nil)
 
     sync.rwMutex.Lock()
-    if database.GetUsersCount() >= MaxUsersCount {
+    if database.GetUsersCount() >= sync.maxUsersCount {
         sync.rwMutex.Unlock()
         sendMessage(connectionId, simpleServerMessage(flagError, toAnonymous))
         finishRequested(connectionId)

@@ -22,18 +22,15 @@ import (
     "ExchatgeServer/crypto"
     "ExchatgeServer/idsPool"
     "ExchatgeServer/utils"
+    "fmt"
     goNet "net"
     goSync "sync"
     "sync/atomic"
     "unsafe"
 )
 
-const host = "0.0.0.0:8080"
-
 const intSize = 4
 const longSize = 8
-
-const MaxUsersCount = 100
 
 const messageSize uint = 1 << 10 // exactly 1 kB
 const messageHeadSize = intSize * 6 + longSize + crypto.TokenSize // 96
@@ -114,7 +111,7 @@ func (xUserInfo *userInfo) pack() []byte {
     return bytes
 }
 
-func Initialize() {
+func Initialize(maxUsersCount uint) {
     var byteOrderChecker uint64 = 0x0123456789abcdef // only on x64 littleEndian data marshalling will work as clients expect
     utils.Assert(unsafe.Sizeof(uintptr(0)) == 8 && *((*uint8) (unsafe.Pointer(&byteOrderChecker))) == 0xef)
 
@@ -124,12 +121,14 @@ func Initialize() {
        serverPublicKey,
        serverSecretKey,
        crypto.EncryptedSize(messageSize),
-        idsPool.InitIdsPool(MaxUsersCount),
+        idsPool.InitIdsPool(uint32(maxUsersCount)),
     }
+
+    syncInitialize(maxUsersCount)
 }
 
-func ProcessClients() {
-    listener, err := goNet.Listen("tcp", host)
+func ProcessClients(host string, port uint) {
+    listener, err := goNet.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
     utils.Assert(err == nil)
 
     var waitGroup goSync.WaitGroup
