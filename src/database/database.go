@@ -64,6 +64,7 @@ var this *database = nil
 func Initialize(maxUsersCount uint32, mongoUrl string, adminPassword []byte) {
     ctx := context.TODO()
 
+    println("aaa", mongoUrl)
     client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoUrl))
     utils.Assert(err == nil)
 

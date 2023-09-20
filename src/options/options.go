@@ -27,12 +27,12 @@ import (
 
 const (
     fileName = "options.txt"
-    host = "Host"
-    port = "Port"
-    maxUsersCount = "MaxUsersCount"
-    serverPrivateSignKey = "ServerPrivateSignKey"
-    mongodbUrl = "MongodbUrl"
-    adminPassword = "AdminPassword"
+    host = "host"
+    port = "port"
+    maxUsersCount = "maxUsersCount"
+    serverPrivateSignKey = "serverPrivateSignKey"
+    mongodbUrl = "mongodbUrl"
+    adminPassword = "adminPassword"
     linesCount = 6
 )
 
@@ -47,7 +47,7 @@ type Options struct {
 
 func Init(secretKeySize uint, maxPasswordSize uint) *Options { // nillable // TODO: replace nillable values with self-made optionals
     exe, _ := os.Executable()
-    
+
     bytes, err := os.ReadFile(filepath.Dir(exe) + "/" + fileName)
     if len(bytes) == 0 || err != nil { return nil }
 
