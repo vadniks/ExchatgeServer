@@ -21,7 +21,7 @@ The following libraries are used:
 * [Sodium](https://github.com/jamesruan/sodium), 
 * [Mongo-driver](https://pkg.go.dev/go.mongodb.org/mongo-driver).
 
-## The project is currently in `Beta` stage
+## The project is currently in development stage
 
 [The client](https://github.com/vadniks/ExchatgeDesktopClient)
 
