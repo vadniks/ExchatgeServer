@@ -33,9 +33,9 @@ The following libraries are used:
 
 ## Build
 
-Firstly, the LibSodium library is needed to be installed, example for Fedora:
+Firstly, the LibSodium library and pkg-config are needed to be installed, example for Arch/Manjaro:
 ```shell
-sudo dnf install libsodium libsodium-devel
+sudo pacman -S libsodium pkgconf
 ```
 Secondly, the project dependencies are needed to be installed, and then, 
 the actual build can be performed:
