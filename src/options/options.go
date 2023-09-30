@@ -125,8 +125,8 @@ func parseAdminPassword(value string, maxPasswordSize uint) []byte { // nillable
     bytes := make([]byte, maxPasswordSize)
 
     var count uint = 0
-    for index, number := range strings.Split(value, ",") {
-        bytes[index] = byte(parseUint(number))
+    for index, char := range value {
+        bytes[index] = byte(char)
         count++
     }
 

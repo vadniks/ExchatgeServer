@@ -57,6 +57,7 @@ const stateLoggedWithCredentials uint = 2
 
 const usernameSize uint = 16
 const UnhashedPasswordSize uint = 16
+const minCredentialSize = 4
 
 const fromAnonymous uint32 = 0xffffffff
 const fromServer uint32 = 0x7fffffff
@@ -200,8 +201,25 @@ func registrationWithCredentialsRequested(connectionId uint32, msg *message) int
         return flagFinishWithError
     }
 
+    countZeroes := func(bytes []byte) uint {
+        var zeroes uint = 0
+        for _, i := range bytes {
+            if i == 0 || i == byte(' ') { zeroes++ }
+        }
+        return zeroes
+    }
+
     username, unhashedPassword := parseCredentials(msg)
-    user := database.AddUser(username, crypto.Hash(unhashedPassword))
+    var user *database.User = nil
+
+    usernameNonZeroes := usernameSize - countZeroes(username)
+    unhashedPasswordNonZeroes := UnhashedPasswordSize - countZeroes(unhashedPassword)
+
+    if usernameNonZeroes >= minCredentialSize && usernameNonZeroes <= usernameSize &&
+        unhashedPasswordNonZeroes >= minCredentialSize && unhashedPasswordNonZeroes <= UnhashedPasswordSize {
+        user = database.AddUser(username, crypto.Hash(unhashedPassword))
+    }
+
     successful := user != nil
 
     sync.rwMutex.Unlock()
