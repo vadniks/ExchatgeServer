@@ -101,7 +101,16 @@ func parseUint(str string) uint {
 }
 
 func parsePort(value string) uint { return parseUint(value) }
-func parseMaxUsersCount(value string) uint { return parseUint(value) }
+
+func parseMaxUsersCount(value string) uint {
+    count := parseUint(value)
+
+    if count > 1 << 14 {
+        return 0
+    } else {
+        return count
+    }
+}
 
 func parseServerPrivateSignKey(value string, secretKeySize uint) []byte { // nillable
     bytes := make([]byte, secretKeySize)
