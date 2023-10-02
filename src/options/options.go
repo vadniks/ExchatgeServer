@@ -105,7 +105,7 @@ func parsePort(value string) uint { return parseUint(value) }
 func parseMaxUsersCount(value string) uint {
     count := parseUint(value)
 
-    if count > 1 << 14 {
+    if count > 1 << 14 { // TODO: extract constant (max possible users count)
         return 0
     } else {
         return count
