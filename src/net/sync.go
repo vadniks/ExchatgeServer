@@ -41,6 +41,7 @@ const flagUnauthenticated int32 = 0x0000000a
 const flagAccessDenied int32 = 0x0000000b
 const flagFetchUsers int32 = 0x0000000c
 const flagFetchMessages int32 = 0x0000000d
+const flagDeleteMessages int32 = 0x0000000e
 const flagExchangeKeys = 0x000000a0
 const flagExchangeKeysDone = 0x000000b0
 const flagExchangeHeaders = 0x000000c0
@@ -128,6 +129,10 @@ func shutdownRequested(connectionId uint32, user *database.User, msg *message) i
         sync.shuttingDown = true
         sync.rwMutex.Unlock()
 
+        sync.rwMutex.Lock()
+        database.DeleteAllMessagesFromAllUsers()
+        sync.rwMutex.Unlock()
+
         return flagShutdown
     } else {
         sendMessage(connectionId, simpleServerMessage(flagAccessDenied, user.Id))
@@ -141,9 +146,12 @@ func proceedRequested(msg *message) int32 {
 
     if toUserConnectionId, toUser := getAuthorizedConnectedUser(msg.to); toUser != nil {
         sendMessage(toUserConnectionId, msg)
-    } else {
-        // TODO: user offline or doesn't exist
-    }
+    } // else user offline or doesn't exist
+
+    sync.rwMutex.Lock()
+    database.AddMessage(msg.timestamp, msg.from, msg.to, msg.body[:])
+    sync.rwMutex.Unlock()
+
     return flagProceed
 }
 
@@ -309,16 +317,26 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
 
 //goland:noinspection GoRedundantConversion
 func messagesRequested(connectionId uint32, msg *message) int32 {
-    intSize := unsafe.Sizeof(int32(0))
-    longSize := unsafe.Sizeof(int64(0))
+    const byteSize = 1
+    utils.Assert(unsafe.Sizeof(true) == byteSize)
+    const intSize = unsafe.Sizeof(int32(0))
+    const longSize = unsafe.Sizeof(int64(0))
 
-    var afterTimestamp uint64 = 0
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&afterTimestamp)), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.body[0]))), longSize))
+    var fromMode byte
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&fromMode)), byteSize), unsafe.Slice((*byte) (&(msg.body[0])), byteSize))
+    utils.Assert(fromMode == 0 || fromMode == 1)
+
+    var afterTimestamp uint64
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&afterTimestamp)), longSize), unsafe.Slice((*byte) (&(msg.body[byteSize])), longSize))
     utils.Assert(afterTimestamp > 0 && afterTimestamp < utils.CurrentTimeMillis())
 
-    var fromUser uint32 = 0
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&fromUser)), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.body[longSize]))), intSize))
-    utils.Assert(fromUser < sync.maxUsersCount)
+    var fromUser uint32
+    if fromMode == 0 {
+        copy(unsafe.Slice((*byte) (unsafe.Pointer(&fromUser)), intSize), unsafe.Slice((*byte) (&(msg.body[byteSize + longSize])), intSize))
+        utils.Assert(fromUser < sync.maxUsersCount)
+    } else {
+        fromUser = msg.from
+    }
 
     if !database.UserExists(fromUser) {
         sendMessage(connectionId, simpleServerMessage(flagError, msg.from))
@@ -326,7 +344,7 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
     }
 
     sync.rwMutex.RLock()
-    messages := database.GetMessagesFromOrForUser(false, msg.from, afterTimestamp)
+    messages := database.GetMessagesFromOrForUser(fromMode == 1, fromUser, afterTimestamp)
     sync.rwMutex.RUnlock()
 
     count := len(messages)
@@ -350,6 +368,41 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
 
         sendMessage(connectionId, newMsg)
     }
+
+    return flagProceed
+}
+
+//goland:noinspection GoRedundantConversion
+func messagesDeletionRequested(connectionId uint32, msg *message) int32 {
+    const byteSize = 1
+    utils.Assert(unsafe.Sizeof(true) == byteSize)
+    const intSize = unsafe.Sizeof(int32(0))
+    const longSize = unsafe.Sizeof(int64(0))
+
+    var fromMode byte
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&fromMode)), byteSize), unsafe.Slice((*byte) (&(msg.body[0])), byteSize))
+    utils.Assert(fromMode == 0 || fromMode == 1)
+
+    var thisAndBeforeTimestamp uint64
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&thisAndBeforeTimestamp)), intSize), unsafe.Slice((*byte) (&(msg.body[0])), longSize))
+    utils.Assert(thisAndBeforeTimestamp > 0 && thisAndBeforeTimestamp < utils.CurrentTimeMillis())
+
+    var fromUser uint32
+    if fromMode == 0 {
+        copy(unsafe.Slice((*byte) (unsafe.Pointer(&fromUser)), intSize), unsafe.Slice((*byte) (&(msg.body[longSize])), intSize))
+        utils.Assert(fromUser < sync.maxUsersCount)
+    } else {
+        fromUser = msg.from
+    }
+
+    if !database.UserExists(fromUser) {
+        sendMessage(connectionId, simpleServerMessage(flagError, msg.from))
+        return flagError
+    }
+
+    sync.rwMutex.Lock()
+    database.DeleteMessagesFromOrForUser(fromMode == 1, fromUser, thisAndBeforeTimestamp)
+    sync.rwMutex.Unlock()
 
     return flagProceed
 }
@@ -428,6 +481,8 @@ func routeMessage(connectionId uint32, msg *message) int32 {
             return usersListRequested(connectionId, *userIdFromToken)
         case flagFetchMessages:
             return messagesRequested(connectionId, msg)
+        case flagDeleteMessages:
+            return messagesDeletionRequested(connectionId, msg)
         default:
             utils.JustThrow()
     }

@@ -269,3 +269,12 @@ func DeleteMessagesFromOrForUser(from bool, id uint32, thisAndBeforeTimestamp ui
     utils.Assert(err == nil)
     return result.DeletedCount > 0
 }
+
+func DeleteAllMessagesFromAllUsers() bool {
+    this.rwMutex.Lock()
+    result, err := this.messages.DeleteMany(*(this.ctx), bson.D{})
+    this.rwMutex.Unlock()
+
+    utils.Assert(err == nil)
+    return result.DeletedCount > 0
+}
