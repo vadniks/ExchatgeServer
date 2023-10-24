@@ -223,6 +223,14 @@ func GetUsersCount() uint32 {
     return uint32(count)
 }
 
+func UserExists(id uint32) bool {
+    this.rwMutex.RLock()
+    result := this.users.FindOne(*(this.ctx), bson.D{{fieldId, id}})
+    this.rwMutex.RUnlock()
+
+    return result.Err() != nil
+}
+
 func GetMessagesFromOrForUser(from bool, id uint32, afterTimestamp uint64) []Message {
     var field string
     if from { field = fieldFrom } else { field = fieldTo }

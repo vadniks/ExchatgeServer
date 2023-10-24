@@ -40,6 +40,7 @@ const flagError int32 = 0x00000009
 const flagUnauthenticated int32 = 0x0000000a
 const flagAccessDenied int32 = 0x0000000b
 const flagFetchUsers int32 = 0x0000000c
+const flagFetchMessages int32 = 0x0000000d
 const flagExchangeKeys = 0x000000a0
 const flagExchangeKeysDone = 0x000000b0
 const flagExchangeHeaders = 0x000000c0
@@ -306,6 +307,53 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
     return flagProceed
 }
 
+//goland:noinspection GoRedundantConversion
+func messagesRequested(connectionId uint32, msg *message) int32 {
+    intSize := unsafe.Sizeof(int32(0))
+    longSize := unsafe.Sizeof(int64(0))
+
+    var afterTimestamp uint64 = 0
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&afterTimestamp)), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.body[0]))), longSize))
+    utils.Assert(afterTimestamp > 0 && afterTimestamp < utils.CurrentTimeMillis())
+
+    var fromUser uint32 = 0
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&fromUser)), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.body[longSize]))), intSize))
+    utils.Assert(fromUser < sync.maxUsersCount)
+
+    if !database.UserExists(fromUser) {
+        sendMessage(connectionId, simpleServerMessage(flagError, msg.from))
+        return flagError
+    }
+
+    sync.rwMutex.RLock()
+    messages := database.GetMessagesFromOrForUser(false, msg.from, afterTimestamp)
+    sync.rwMutex.RUnlock()
+
+    count := len(messages)
+    for index, xMessage := range messages {
+        newMsg := &message{
+            flagFetchMessages,
+            utils.CurrentTimeMillis(),
+            uint32(len(xMessage.Body)),
+            uint32(index),
+            uint32(count),
+            fromServer,
+            msg.from,
+            sync.tokenServer,
+            [messageBodySize]byte{},
+        }
+
+        copy(
+            unsafe.Slice((*byte) (unsafe.Pointer(&(newMsg.body[0]))), messageBodySize),
+            unsafe.Slice((*byte) (unsafe.Pointer(&(xMessage.Body[0]))), len(xMessage.Body)),
+        )
+
+        sendMessage(connectionId, newMsg)
+    }
+
+    return flagProceed
+}
+
 func routeMessage(connectionId uint32, msg *message) int32 {
     utils.Assert(msg != nil)
     flag := msg.flag
@@ -335,7 +383,12 @@ func routeMessage(connectionId uint32, msg *message) int32 {
             msg.from != fromServer,
         )
 
-        if xConnectionId == nil || userIdFromToken == nil || *xConnectionId != connectionId || *userIdFromToken != *userId {
+        if xConnectionId == nil ||
+            userIdFromToken == nil ||
+            *xConnectionId != connectionId ||
+            *userIdFromToken != *userId ||
+            msg.from != *userIdFromToken {
+
             sync.rwMutex.Unlock()
 
             sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
@@ -373,6 +426,8 @@ func routeMessage(connectionId uint32, msg *message) int32 {
             return finishRequested(connectionId)
         case flagFetchUsers:
             return usersListRequested(connectionId, *userIdFromToken)
+        case flagFetchMessages:
+            return messagesRequested(connectionId, msg)
         default:
             utils.JustThrow()
     }
