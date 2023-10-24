@@ -1,5 +1,5 @@
 
-use db
+use admin
 db.users.insertOne({id:6})
 db.users.countDocuments()
 db.users.find({"id":0})

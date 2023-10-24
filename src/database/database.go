@@ -34,16 +34,29 @@ import (
 
 const databaseName = "admin"
 const collectionUsers = "users"
+const collectionMessages = "messages"
 
 const fieldRealId = "_id"
 const fieldId = "id"
 const fieldName = "name"
 const fieldPassword = "password"
 
+const fieldTimestamp = "timestamp"
+const fieldFrom = "from"
+const fieldTo = "to"
+const fieldBody = "body"
+
 type User struct {
     Id uint32 `bson:"id"`
     Name []byte `bson:"name"`
     Password []byte `bson:"password"` // salty-hashed
+}
+
+type Message struct {
+    Timestamp uint64 `bson:"timestamp"`
+    From uint32 `bson:"from"`
+    To uint32 `bson:"to"`
+    Body []byte `bson:"body"`
 }
 
 func (user *User) passwordHashed() *User {
@@ -53,7 +66,8 @@ func (user *User) passwordHashed() *User {
 
 type database struct {
     ctx *context.Context
-    collection *mongo.Collection
+    users *mongo.Collection
+    messages *mongo.Collection
     client *mongo.Client
     adminUsername []byte
     adminPassword []byte
@@ -68,10 +82,10 @@ func Initialize(maxUsersCount uint32, mongoUrl string, adminPassword []byte) {
     client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoUrl))
     utils.Assert(err == nil)
 
-    collection := client.Database(databaseName).Collection(collectionUsers)
     this = &database{
         &ctx,
-        collection,
+        client.Database(databaseName).Collection(collectionUsers),
+        client.Database(databaseName).Collection(collectionMessages),
         client,
         []byte{'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
         crypto.Hash(adminPassword),
@@ -110,11 +124,11 @@ func addAdminIfNotExists() { // admin is the only user that has id equal to 0
     id := availableUserId()
     utils.Assert(id != nil && *id == uint32(0))
 
-    if result := this.collection.FindOne(
+    if result := this.users.FindOne(
         *(this.ctx),
         bson.D{{fieldId, 0}, {fieldName, this.adminUsername}},
     ); errors.Is(result.Err(), mongo.ErrNoDocuments) {
-        _, err := this.collection.InsertOne(*(this.ctx), User{Id: *id, Name: this.adminUsername, Password: this.adminPassword})
+        _, err := this.users.InsertOne(*(this.ctx), User{Id: *id, Name: this.adminUsername, Password: this.adminPassword})
         utils.Assert(err == nil)
     }
 }
@@ -133,7 +147,7 @@ func FindUser(username []byte, unhashedPassword []byte) *User { // nillable resu
     utils.Assert(len(username) > 0 && len(unhashedPassword) > 0)
 
     this.rwMutex.RLock()
-    result := this.collection.FindOne(*(this.ctx), bson.D{{fieldName, username}})
+    result := this.users.FindOne(*(this.ctx), bson.D{{fieldName, username}})
     this.rwMutex.RUnlock()
 
     if result.Err() != nil { return nil }
@@ -147,7 +161,7 @@ func FindUser(username []byte, unhashedPassword []byte) *User { // nillable resu
 
 func usernameAlreadyInUse(username []byte) bool { // username must be unique
     utils.Assert(len(username) > 0)
-    result := this.collection.FindOne(*(this.ctx), bson.D{{fieldName, username}})
+    result := this.users.FindOne(*(this.ctx), bson.D{{fieldName, username}})
     return result.Err() == nil
 }
 
@@ -169,13 +183,13 @@ func AddUser(username []byte, hashedPassword []byte) *User { // nillable result
     }
     utils.Assert(*userId > 0)
 
-    result, err := this.collection.InsertOne(*(this.ctx), User{Id: *userId, Name: username, Password: hashedPassword})
+    result, err := this.users.InsertOne(*(this.ctx), User{Id: *userId, Name: username, Password: hashedPassword})
     if result == nil || err != nil {
         this.rwMutex.Unlock()
         return nil
     }
 
-    result2 := this.collection.FindOne(*(this.ctx), bson.D{{fieldRealId, result.InsertedID}})
+    result2 := this.users.FindOne(*(this.ctx), bson.D{{fieldRealId, result.InsertedID}})
     utils.Assert(result2.Err() == nil)
 
     user := new(User)
@@ -186,9 +200,11 @@ func AddUser(username []byte, hashedPassword []byte) *User { // nillable result
     return user
 }
 
+// TODO: DeleteUser(...)
+
 func GetAllUsers() []User {
     this.rwMutex.RLock()
-    cursor, err := this.collection.Find(*(this.ctx), bson.D{})
+    cursor, err := this.users.Find(*(this.ctx), bson.D{})
     this.rwMutex.RUnlock()
 
     utils.Assert(err == nil)
@@ -200,9 +216,48 @@ func GetAllUsers() []User {
 
 func GetUsersCount() uint32 {
     this.rwMutex.RLock()
-    count, err := this.collection.EstimatedDocumentCount(*(this.ctx))
+    count, err := this.users.EstimatedDocumentCount(*(this.ctx))
     this.rwMutex.RUnlock()
 
     utils.Assert(err == nil)
     return uint32(count)
+}
+
+func GetMessagesFromOrForUser(from bool, id uint32, afterTimestamp uint64) []Message {
+    var field string
+    if from { field = fieldFrom } else { field = fieldTo }
+
+    this.rwMutex.RLock()
+    cursor, err := this.messages.Find(*(this.ctx), bson.M{
+        field: id, fieldTimestamp: bson.M{"$gt": afterTimestamp}, "$orderby": bson.M{fieldTimestamp: 1},
+    })
+    this.rwMutex.RUnlock()
+
+    utils.Assert(err == nil)
+
+    var messages []Message
+    utils.Assert(cursor.All(*(this.ctx), &messages) == nil)
+    return messages
+}
+
+func AddMessage(timestamp uint64, from uint32, to uint32, body []byte) bool {
+    this.rwMutex.Lock()
+    result, err := this.messages.InsertOne(*(this.ctx), Message{timestamp, from, to, body})
+    this.rwMutex.Unlock()
+
+    return result != nil && err == nil
+}
+
+func DeleteMessagesFromOrForUser(from bool, id uint32, thisAndBeforeTimestamp uint64) bool {
+    var field string
+    if from { field = fieldFrom } else { field = fieldTo }
+
+    this.rwMutex.Lock()
+    result, err := this.messages.DeleteMany(*(this.ctx), bson.M{
+        field: id, fieldTimestamp: bson.M{"$lte": thisAndBeforeTimestamp},
+    })
+    this.rwMutex.Unlock()
+
+    utils.Assert(err == nil)
+    return result.DeletedCount > 0
 }
