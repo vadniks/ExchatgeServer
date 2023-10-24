@@ -23,6 +23,7 @@ import (
     xIdsPool "ExchatgeServer/idsPool"
     "ExchatgeServer/utils"
     "context"
+    "errors"
     "go.mongodb.org/mongo-driver/bson"
     "go.mongodb.org/mongo-driver/mongo"
     "go.mongodb.org/mongo-driver/mongo/options"
@@ -78,7 +79,7 @@ func Initialize(maxUsersCount uint32, mongoUrl string, adminPassword []byte) {
         sync.RWMutex{},
     }
 
-    for i, _ := range adminPassword { adminPassword[i] = 0 }
+    for i := range adminPassword { adminPassword[i] = 0 }
 
     addAdminIfNotExists()
     mocData() // TODO: test only
@@ -112,7 +113,7 @@ func addAdminIfNotExists() { // admin is the only user that has id equal to 0
     if result := this.collection.FindOne(
         *(this.ctx),
         bson.D{{fieldId, 0}, {fieldName, this.adminUsername}},
-    ); result.Err() == mongo.ErrNoDocuments {
+    ); errors.Is(result.Err(), mongo.ErrNoDocuments) {
         _, err := this.collection.InsertOne(*(this.ctx), User{Id: *id, Name: this.adminUsername, Password: this.adminPassword})
         utils.Assert(err == nil)
     }
