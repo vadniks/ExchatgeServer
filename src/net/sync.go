@@ -322,8 +322,7 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
     const intSize = unsafe.Sizeof(int32(0))
     const longSize = unsafe.Sizeof(int64(0))
 
-    var fromMode byte
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&fromMode)), byteSize), unsafe.Slice((*byte) (&(msg.body[0])), byteSize))
+    fromMode := msg.body[0]
     utils.Assert(fromMode == 0 || fromMode == 1)
 
     var afterTimestamp uint64
@@ -379,8 +378,7 @@ func messagesDeletionRequested(connectionId uint32, msg *message) int32 {
     const intSize = unsafe.Sizeof(int32(0))
     const longSize = unsafe.Sizeof(int64(0))
 
-    var fromMode byte
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&fromMode)), byteSize), unsafe.Slice((*byte) (&(msg.body[0])), byteSize))
+    fromMode := msg.body[0]
     utils.Assert(fromMode == 0 || fromMode == 1)
 
     var thisAndBeforeTimestamp uint64
