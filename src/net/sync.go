@@ -41,7 +41,6 @@ const flagUnauthenticated int32 = 0x0000000a
 const flagAccessDenied int32 = 0x0000000b
 const flagFetchUsers int32 = 0x0000000c
 const flagFetchMessages int32 = 0x0000000d
-const flagDeleteMessages int32 = 0x0000000e
 const flagExchangeKeys = 0x000000a0
 const flagExchangeKeysDone = 0x000000b0
 const flagExchangeHeaders = 0x000000c0
@@ -347,6 +346,8 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
     sync.rwMutex.RUnlock()
 
     count := len(messages)
+    var lastMessageTimestamp uint64 = 0
+
     for index, xMessage := range messages {
         newMsg := &message{
             flagFetchMessages,
@@ -366,40 +367,14 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
         )
 
         sendMessage(connectionId, newMsg)
-    }
 
-    return flagProceed
-}
-
-//goland:noinspection GoRedundantConversion
-func messagesDeletionRequested(connectionId uint32, msg *message) int32 {
-    const byteSize = 1
-    utils.Assert(unsafe.Sizeof(true) == byteSize)
-    const intSize = unsafe.Sizeof(int32(0))
-    const longSize = unsafe.Sizeof(int64(0))
-
-    fromMode := msg.body[0]
-    utils.Assert(fromMode == 0 || fromMode == 1)
-
-    var thisAndBeforeTimestamp uint64
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&thisAndBeforeTimestamp)), intSize), unsafe.Slice((*byte) (&(msg.body[0])), longSize))
-    utils.Assert(thisAndBeforeTimestamp > 0 && thisAndBeforeTimestamp < utils.CurrentTimeMillis())
-
-    var fromUser uint32
-    if fromMode == 0 {
-        copy(unsafe.Slice((*byte) (unsafe.Pointer(&fromUser)), intSize), unsafe.Slice((*byte) (&(msg.body[longSize])), intSize))
-        utils.Assert(fromUser < sync.maxUsersCount)
-    } else {
-        fromUser = msg.from
-    }
-
-    if !database.UserExists(fromUser) {
-        sendMessage(connectionId, simpleServerMessage(flagError, msg.from))
-        return flagError
+        if timestamp := xMessage.Timestamp; lastMessageTimestamp < timestamp {
+            lastMessageTimestamp = timestamp
+        }
     }
 
     sync.rwMutex.Lock()
-    database.DeleteMessagesFromOrForUser(fromMode == 1, fromUser, thisAndBeforeTimestamp)
+    database.DeleteMessagesFromOrForUser(fromMode == 1, fromUser, lastMessageTimestamp)
     sync.rwMutex.Unlock()
 
     return flagProceed
@@ -479,8 +454,6 @@ func routeMessage(connectionId uint32, msg *message) int32 {
             return usersListRequested(connectionId, *userIdFromToken)
         case flagFetchMessages:
             return messagesRequested(connectionId, msg)
-        case flagDeleteMessages:
-            return messagesDeletionRequested(connectionId, msg)
         default:
             utils.JustThrow()
     }
