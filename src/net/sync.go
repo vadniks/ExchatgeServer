@@ -348,6 +348,21 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
     count := len(messages)
     var lastMessageTimestamp uint64 = 0
 
+    if count == 0 {
+        sendMessage(connectionId, &message{
+            flagFetchMessages,
+            utils.CurrentTimeMillis(),
+            0,
+            0,
+            1,
+            fromServer,
+            msg.from,
+            sync.tokenServer,
+            [messageBodySize]byte{},
+        })
+        return flagProceed
+    }
+
     for index, xMessage := range messages {
         newMsg := &message{
             flagFetchMessages,
@@ -355,7 +370,7 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
             uint32(len(xMessage.Body)),
             uint32(index),
             uint32(count),
-            fromServer,
+            xMessage.From,
             msg.from,
             sync.tokenServer,
             [messageBodySize]byte{},
@@ -444,15 +459,20 @@ func routeMessage(connectionId uint32, msg *message) int32 {
         case flagProceed:
             return proceedRequested(msg)
         case flagLogIn:
+            utils.Assert(msg.to == toServer)
             return loggingInWithCredentialsRequested(connectionId, msg)
         case flagRegister:
+            utils.Assert(msg.to == toServer)
             return registrationWithCredentialsRequested(connectionId, msg)
         case flagFinish:
             utils.Assert(msg.to == toServer)
+            utils.Assert(msg.to == toServer)
             return finishRequested(connectionId)
         case flagFetchUsers:
+            utils.Assert(msg.to == toServer)
             return usersListRequested(connectionId, *userIdFromToken)
         case flagFetchMessages:
+            utils.Assert(msg.to == toServer)
             return messagesRequested(connectionId, msg)
         default:
             utils.JustThrow()
