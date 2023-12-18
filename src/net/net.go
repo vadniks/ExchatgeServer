@@ -136,7 +136,7 @@ func ProcessClients(host string, port uint) {
     var acceptingClients atomic.Bool
     acceptingClients.Store(true)
 
-    onShutDownRequested := func() {
+    onShutDownRequested := func() { // TODO: add timeouts for connections
         acceptingClients.Store(false)
         utils.Assert(listener.Close() == nil)
         waitGroup.Wait()
