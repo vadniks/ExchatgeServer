@@ -330,10 +330,10 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
 
     var fromUser uint32
     if fromMode == 0 {
+        fromUser = msg.from
+    } else {
         copy(unsafe.Slice((*byte) (unsafe.Pointer(&fromUser)), intSize), unsafe.Slice((*byte) (&(msg.body[byteSize + longSize])), intSize))
         utils.Assert(fromUser < sync.maxUsersCount)
-    } else {
-        fromUser = msg.from
     }
 
     if !database.UserExists(fromUser) {
@@ -372,7 +372,7 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
     for index, xMessage := range messages {
         newMsg := &message{
             flagFetchMessages,
-            utils.CurrentTimeMillis(),
+            xMessage.Timestamp,
             uint32(len(xMessage.Body)),
             uint32(index),
             uint32(count),
