@@ -258,6 +258,8 @@ func AddMessage(timestamp uint64, from uint32, to uint32, body []byte) bool {
     return result != nil && err == nil
 }
 
+// DeleteMessagesFromOrForUser *to disable warning (comment of exported element starts with...)*
+// Deprecated: it's better to delete all messages from all users at server's shutdown
 func DeleteMessagesFromOrForUser(from bool, id uint32, thisAndBeforeTimestamp uint64) bool {
     var field string
     if from { field = fieldFrom } else { field = fieldTo }

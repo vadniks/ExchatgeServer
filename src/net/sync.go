@@ -394,9 +394,9 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
         }
     }
 
-    sync.rwMutex.Lock()
-    database.DeleteMessagesFromOrForUser(fromMode == 1, fromUser, lastMessageTimestamp)
-    sync.rwMutex.Unlock()
+    //sync.rwMutex.Lock() // deprecated
+    //database.DeleteMessagesFromOrForUser(fromMode == 1, fromUser, lastMessageTimestamp)
+    //sync.rwMutex.Unlock()
 
     return flagProceed
 }
