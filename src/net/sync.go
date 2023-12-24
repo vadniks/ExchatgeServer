@@ -326,7 +326,7 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
 
     var afterTimestamp uint64
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&afterTimestamp)), longSize), unsafe.Slice((*byte) (&(msg.body[byteSize])), longSize))
-    utils.Assert(afterTimestamp > 0 && afterTimestamp < utils.CurrentTimeMillis())
+    utils.Assert(afterTimestamp < utils.CurrentTimeMillis())
 
     var fromUser uint32
     if fromMode == 0 {
