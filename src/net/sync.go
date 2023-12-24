@@ -148,7 +148,7 @@ func proceedRequested(msg *message) int32 {
     } // else user offline or doesn't exist
 
     sync.rwMutex.Lock()
-    database.AddMessage(msg.timestamp, msg.from, msg.to, msg.body[:])
+    database.AddMessage(msg.timestamp, msg.from, msg.to, msg.body[:msg.size])
     sync.rwMutex.Unlock()
 
     return flagProceed
@@ -370,6 +370,8 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
     }
 
     for index, xMessage := range messages {
+        println("mr", index, uint32(len(xMessage.Body))) // TODO: debug
+
         newMsg := &message{
             flagFetchMessages,
             xMessage.Timestamp,
