@@ -349,7 +349,7 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
     var lastMessageTimestamp uint64 = 0
 
     if count == 0 {
-        sendMessage(connectionId, &message{
+        reply := &message{
             flagFetchMessages,
             utils.CurrentTimeMillis(),
             0,
@@ -359,7 +359,13 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
             msg.from,
             sync.tokenServer,
             [messageBodySize]byte{},
-        })
+        }
+
+        reply.body[0] = fromMode
+        copy(unsafe.Slice((*byte) (&(reply.body[byteSize])), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&afterTimestamp)), longSize))
+        copy(unsafe.Slice((*byte) (&(reply.body[byteSize + longSize])), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&fromUser)), longSize))
+
+        sendMessage(connectionId, reply)
         return flagProceed
     }
 

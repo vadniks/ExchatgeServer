@@ -228,7 +228,7 @@ func UserExists(id uint32) bool {
     result := this.users.FindOne(*(this.ctx), bson.D{{fieldId, id}})
     this.rwMutex.RUnlock()
 
-    return result.Err() != nil
+    return result.Err() == nil
 }
 
 func GetMessagesFromOrForUser(from bool, id uint32, afterTimestamp uint64) []Message {
@@ -236,9 +236,11 @@ func GetMessagesFromOrForUser(from bool, id uint32, afterTimestamp uint64) []Mes
     if from { field = fieldFrom } else { field = fieldTo }
 
     this.rwMutex.RLock()
-    cursor, err := this.messages.Find(*(this.ctx), bson.M{
-        field: id, fieldTimestamp: bson.M{"$gt": afterTimestamp}, "$orderby": bson.M{fieldTimestamp: 1},
-    })
+    cursor, err := this.messages.Find(
+        *(this.ctx),
+        bson.M{field: id, fieldTimestamp: bson.M{"$gt": afterTimestamp}},
+        options.Find().SetSort(bson.D{{fieldTimestamp, 1}}),
+    )
     this.rwMutex.RUnlock()
 
     utils.Assert(err == nil)
