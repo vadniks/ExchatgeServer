@@ -370,8 +370,6 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
     }
 
     for index, xMessage := range messages {
-        println("mr", index, uint32(len(xMessage.Body))) // TODO: debug
-
         newMsg := &message{
             flagFetchMessages,
             xMessage.Timestamp,
