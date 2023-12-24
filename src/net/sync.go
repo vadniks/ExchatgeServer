@@ -121,22 +121,22 @@ func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
 func shutdownRequested(connectionId uint32, user *database.User, msg *message) int32 { // TODO: add more administrative actions, such as: logging in and registration blocking, user ban...
     utils.Assert(user != nil && msg.to == toServer)
 
-    if database.IsAdmin(user) {
-        finishRequested(connectionId)
-
-        sync.rwMutex.Lock()
-        sync.shuttingDown = true
-        sync.rwMutex.Unlock()
-
-        sync.rwMutex.Lock()
-        database.DeleteAllMessagesFromAllUsers()
-        sync.rwMutex.Unlock()
-
-        return flagShutdown
-    } else {
+    if !database.IsAdmin(user) {
         sendMessage(connectionId, simpleServerMessage(flagAccessDenied, user.Id))
         return flagProceed
     }
+
+    finishRequested(connectionId)
+
+    sync.rwMutex.Lock()
+    sync.shuttingDown = true
+    sync.rwMutex.Unlock()
+
+    sync.rwMutex.Lock()
+    database.DeleteAllMessagesFromAllUsers()
+    sync.rwMutex.Unlock()
+
+    return flagShutdown
 }
 
 //goland:noinspection GoRedundantConversion (*byte) - just silence that annoying warning already!
