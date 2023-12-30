@@ -26,7 +26,8 @@ import (
     goNet "net"
     goSync "sync"
     "sync/atomic"
-    "unsafe"
+    "time"
+"unsafe"
 )
 
 const intSize = 4
@@ -36,6 +37,9 @@ const messageSize uint = 1 << 10 // exactly 1 kB
 const messageHeadSize = intSize * 6 + longSize + crypto.TokenSize // 96
 const messageBodySize = messageSize - messageHeadSize // 928
 const userInfoSize = intSize + 1/*sizeof(bool)*/ + usernameSize // 21
+
+const maxTimeMillisToPreserveActiveConnection = 1000 * 60 * 60 // 1 hour
+const maxTimeMillisIntervalBetweenMessages = 1000 * 60 * 10 // 10 minutes
 
 type netT struct {
     serverPublicKey []byte
@@ -170,8 +174,15 @@ func sendDenialOfService(listener goNet.Listener) {
     utils.Assert(err == nil)
 }
 
+func updateConnectionIdleTimeout(connection *goNet.Conn) {
+    err := (*connection).SetDeadline(time.UnixMilli(int64(utils.CurrentTimeMillis()) + maxTimeMillisIntervalBetweenMessages))
+    utils.Assert(err == nil)
+}
+
 func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSync.WaitGroup, onShutDownRequested *func()) {
     utils.Assert(waitGroup != nil && onShutDownRequested != nil)
+
+    updateConnectionIdleTimeout(connection)
 
     closeConnection := func(disconnectedByClient bool) {
         if disconnectedByClient {
@@ -190,7 +201,10 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
     send(connection, crypto.Sign(net.serverPublicKey))
 
     clientPublicKey := make([]byte, crypto.KeySize)
-    utils.Assert(receive(connection, clientPublicKey, nil)) // TODO: replace assert with connection drop here so clients cannot brake the server
+    if !receive(connection, clientPublicKey, nil) {
+        closeConnection(false)
+        return
+    }
 
     serverKey, clientKey := crypto.ExchangeKeys(net.serverPublicKey, net.serverSecretKey, clientPublicKey)
     if serverKey == nil || clientKey == nil {
@@ -202,20 +216,26 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
     send(connection, crypto.Sign(serverStreamHeader))
 
     clientStreamHeader := make([]byte, crypto.HeaderSize)
-    utils.Assert(receive(connection, clientStreamHeader, nil))
+    if !receive(connection, clientStreamHeader, nil) {
+        closeConnection(false)
+        return
+    }
 
     if !xCrypto.CreateDecoderStream(clientKey, clientStreamHeader) {
         closeConnection(false)
         return
     }
 
+    connectedAt := utils.CurrentTimeMillis()
     addNewConnection(connectionId, connection, xCrypto)
 
     messageBuffer := make([]byte, net.messageBufferSize)
     for {
         disconnected := false
 
-        if receive(connection, messageBuffer, &disconnected) { // TODO: add timeout for an opened connection and limit connection count
+        if utils.CurrentTimeMillis() - connectedAt < maxTimeMillisToPreserveActiveConnection &&
+            receive(connection, messageBuffer, &disconnected) {
+
             switch processClientMessage(connectionId, messageBuffer) {
                 case flagFinishToReconnect: fallthrough
                 case flagFinishWithError: fallthrough
@@ -231,6 +251,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
         }
 
         if disconnected {
+            println("disconnected")
             closeConnection(true)
             return
         }
@@ -239,8 +260,11 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
 
 func send(connection *goNet.Conn, payload []byte) {
     utils.Assert(connection != nil && len(payload) > 0)
+
     count, err := (*connection).Write(payload)
     utils.Assert(count == len(payload) && err == nil)
+
+    updateConnectionIdleTimeout(connection)
 }
 
 func receive(connection *goNet.Conn, buffer []byte, /*nillable*/ error *bool) bool {
@@ -249,6 +273,8 @@ func receive(connection *goNet.Conn, buffer []byte, /*nillable*/ error *bool) bo
     count, err := (*connection).Read(buffer)
     if error != nil { *error = err != nil }
     if err != nil { return false }
+
+    updateConnectionIdleTimeout(connection)
 
     return count == len(buffer)
 }
