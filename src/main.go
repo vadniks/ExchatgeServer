@@ -76,7 +76,7 @@ func main() {
     database.Initialize(uint32(xOptions.MaxUsersCount), xOptions.MongodbUrl, xOptions.AdminPassword)
     println("connected to the database...")
 
-    net.Initialize(xOptions.MaxUsersCount)
+    net.Initialize(xOptions.MaxUsersCount, xOptions.MaxTimeMillisToPreserveActiveConnection, xOptions.MaxTimeMillisIntervalBetweenMessages)
     println("initialized; running")
 
     net.ProcessClients(xOptions.Host, xOptions.Port)

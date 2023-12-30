@@ -38,10 +38,9 @@ const messageHeadSize = intSize * 6 + longSize + crypto.TokenSize // 96
 const messageBodySize = messageSize - messageHeadSize // 928
 const userInfoSize = intSize + 1/*sizeof(bool)*/ + usernameSize // 21
 
-const maxTimeMillisToPreserveActiveConnection = 1000 * 60 * 60 // 1 hour
-const maxTimeMillisIntervalBetweenMessages = 1000 * 60 * 10 // 10 minutes
-
 type netT struct {
+    maxTimeMillisToPreserveActiveConnection uint64
+    maxTimeMillisIntervalBetweenMessages uint64
     serverPublicKey []byte
     serverSecretKey []byte
     messageBufferSize uint
@@ -115,13 +114,15 @@ func (xUserInfo *userInfo) pack() []byte {
     return bytes
 }
 
-func Initialize(maxUsersCount uint) {
+func Initialize(maxUsersCount uint, maxTimeMillisToPreserveActiveConnection uint, maxTimeMillisIntervalBetweenMessages uint) {
     var byteOrderChecker uint64 = 0x0123456789abcdef // only on x64 littleEndian data marshalling will work as clients expect
     utils.Assert(unsafe.Sizeof(uintptr(0)) == 8 && *((*uint8) (unsafe.Pointer(&byteOrderChecker))) == 0xef)
 
     serverPublicKey, serverSecretKey := crypto.GenerateServerKeys()
 
     net = &netT{
+        uint64(maxTimeMillisToPreserveActiveConnection),
+        uint64(maxTimeMillisIntervalBetweenMessages),
        serverPublicKey,
        serverSecretKey,
        crypto.EncryptedSize(messageSize),
@@ -132,6 +133,7 @@ func Initialize(maxUsersCount uint) {
 }
 
 func ProcessClients(host string, port uint) {
+    utils.Assert(net != nil)
     listener, err := goNet.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
     utils.Assert(err == nil)
 
@@ -175,7 +177,7 @@ func sendDenialOfService(listener goNet.Listener) {
 }
 
 func updateConnectionIdleTimeout(connection *goNet.Conn) {
-    err := (*connection).SetDeadline(time.UnixMilli(int64(utils.CurrentTimeMillis()) + maxTimeMillisIntervalBetweenMessages))
+    err := (*connection).SetDeadline(time.UnixMilli(int64(utils.CurrentTimeMillis()) + int64(net.maxTimeMillisIntervalBetweenMessages)))
     utils.Assert(err == nil)
 }
 
@@ -233,7 +235,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
     for {
         disconnected := false
 
-        if utils.CurrentTimeMillis() - connectedAt < maxTimeMillisToPreserveActiveConnection &&
+        if utils.CurrentTimeMillis() - connectedAt < net.maxTimeMillisToPreserveActiveConnection &&
             receive(connection, messageBuffer, &disconnected) {
 
             switch processClientMessage(connectionId, messageBuffer) {

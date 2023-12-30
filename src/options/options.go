@@ -33,7 +33,9 @@ const (
     serverPrivateSignKey = "serverPrivateSignKey"
     mongodbUrl = "mongodbUrl"
     adminPassword = "adminPassword"
-    linesCount = 6
+    maxTimeMillisToPreserveActiveConnection = "maxTimeMillisToPreserveActiveConnection"
+    maxTimeMillisIntervalBetweenMessages = "maxTimeMillisIntervalBetweenMessages"
+    linesCount = 8
 )
 
 type Options struct {
@@ -43,6 +45,8 @@ type Options struct {
     ServerPrivateSignKey []byte
     MongodbUrl string
     AdminPassword []byte // TODO: fill with random bytes after use
+    MaxTimeMillisToPreserveActiveConnection uint
+    MaxTimeMillisIntervalBetweenMessages uint
 }
 
 func Init(secretKeySize uint, maxPasswordSize uint) *Options { // nillable // TODO: replace nillable values with self-made optionals
@@ -86,6 +90,12 @@ func Init(secretKeySize uint, maxPasswordSize uint) *Options { // nillable // TO
             case adminPassword:
                 options.AdminPassword = parseAdminPassword(value, maxPasswordSize)
                 if len(options.AdminPassword) == 0 { return nil }
+            case maxTimeMillisToPreserveActiveConnection:
+                options.MaxTimeMillisToPreserveActiveConnection = parseMaxTimeMillisToPreserveActiveConnection(value)
+                if options.MaxTimeMillisToPreserveActiveConnection == 0 { return nil }
+            case maxTimeMillisIntervalBetweenMessages:
+                options.MaxTimeMillisIntervalBetweenMessages = parseMaxTimeMillisIntervalBetweenMessages(value)
+                if options.MaxTimeMillisIntervalBetweenMessages == 0 { return nil }
         }
     }
 
@@ -145,3 +155,7 @@ func parseAdminPassword(value string, maxPasswordSize uint) []byte { // nillable
         return bytes
     }
 }
+
+func parseMaxTimeMillisToPreserveActiveConnection(value string) uint { return parseUint(value) }
+
+func parseMaxTimeMillisIntervalBetweenMessages(value string) uint { return parseUint(value) }
