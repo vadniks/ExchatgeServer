@@ -31,6 +31,16 @@ import (
     "time"
 )
 
+const databaseAvailabilityCheckMaxTries = 10 // 10 seconds timeout
+
+func checkDatabaseAvailability(url string) bool {
+    cmd := exec.Command("curl", "-f", url)
+    utils.Assert(cmd.Err == nil)
+
+    out, err := cmd.Output()
+    return err == nil && strings.Contains(string(out), "MongoDB")
+}
+
 func main() {
     print("\033[1;32m" +
     "_______ _     _ _______ _     _ _______ _______  ______ _______\n" +
@@ -47,19 +57,14 @@ func main() {
         return
     }
 
-    cmd := exec.Command("curl", "-f", strings.Split(xOptions.MongodbUrl, "@")[1])
-    utils.Assert(cmd.Err == nil)
-    out, err := cmd.Output()
-
     counter := 0
-    const maxTries = 10
-    for err != nil || !strings.Contains(string(out), "MongoDB") {
-        if counter >= maxTries {
+    for !checkDatabaseAvailability(strings.Split(xOptions.MongodbUrl, "@")[1]) {
+        if counter >= databaseAvailabilityCheckMaxTries {
             println("timeout exceeded, exiting...")
             os.Exit(1)
             return
         } else {
-            fmt.Printf("waiting for the database to become available (%d/%d)...\n", counter, maxTries)
+            fmt.Printf("waiting for the database to become available (%d/%d)...\n", counter, databaseAvailabilityCheckMaxTries)
         }
 
         counter++

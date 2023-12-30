@@ -5,4 +5,4 @@ COPY ./src /server/src
 RUN mkdir /server/build
 RUN go build -C /server/src -o /server/build/ExchatgeServer ExchatgeServer
 COPY options.txt /server/build/options.txt
-ENTRYPOINT /bin/sleep 10 && /server/build/ExchatgeServer
+ENTRYPOINT /server/build/ExchatgeServer
