@@ -226,15 +226,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
                     closeConnection(false)
                     (*onShutDownRequested)()
                     return
-                case flagProceed: fallthrough
-                case flagExchangeKeys: fallthrough
-                case flagExchangeKeysDone: fallthrough
-                case flagExchangeHeaders: fallthrough
-                case flagExchangeHeadersDone: fallthrough
-                case flagFileAsk: fallthrough
-                case flagFile: fallthrough
-                case flagError: fallthrough
-                case flagSuccess: func(){}()
+                default: {}
             }
         }
 
