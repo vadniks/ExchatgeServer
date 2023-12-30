@@ -142,11 +142,13 @@ func ProcessClients(host string, port uint) {
     var acceptingClients atomic.Bool
     acceptingClients.Store(true)
 
-    onShutDownRequested := func() { // TODO: add timeouts for connections
+    onShutDownRequested := func() {
         acceptingClients.Store(false)
         utils.Assert(listener.Close() == nil)
         waitGroup.Wait()
     }
+
+    go watchConnectionTimeouts(&acceptingClients)
 
     var connectionId uint32 = 0
     for acceptingClients.Load() { // TODO: forbid logging in with credentials of an user which has already logged in and is still connected
@@ -176,6 +178,15 @@ func sendDenialOfService(listener goNet.Listener) {
     utils.Assert(err == nil)
 }
 
+func watchConnectionTimeouts(acceptingClients *atomic.Bool) {
+    for acceptingClients.Load() {
+        checkConnectionTimeouts(func(xConnectedUser *connectedUser) {
+            println("aaa")
+            utils.Assert((*(xConnectedUser.connection)).Close() == nil)
+        })
+    }
+}
+
 func updateConnectionIdleTimeout(connection *goNet.Conn) {
     err := (*connection).SetDeadline(time.UnixMilli(int64(utils.CurrentTimeMillis()) + int64(net.maxTimeMillisIntervalBetweenMessages)))
     utils.Assert(err == nil)
@@ -189,7 +200,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
     closeConnection := func(disconnectedByClient bool) {
         if disconnectedByClient {
             utils.Assert(getConnectedUser(connectionId) != nil)
-            onConnectionClosed(connectionId)
+            deleteConnection(connectionId)
         } else {
             utils.Assert(getConnectedUser(connectionId) == nil)
         }
@@ -197,7 +208,10 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
         net.connectionIdsPool.ReturnId(connectionId)
         waitGroup.Done()
 
-        utils.Assert((*connection).Close() == nil)
+        println("ccc")
+
+        a := (*connection).Close()
+        if a != nil { panic(a.Error()) }
     }
 
     send(connection, crypto.Sign(net.serverPublicKey))
@@ -228,17 +242,11 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
         return
     }
 
-    connectedAt := utils.CurrentTimeMillis()
     addNewConnection(connectionId, connection, xCrypto)
 
     messageBuffer := make([]byte, net.messageBufferSize)
     for {
         disconnected := false
-
-        if utils.CurrentTimeMillis() - connectedAt > net.maxTimeMillisToPreserveActiveConnection { // TODO: interrupt each goroutine when it's timeout exceeds in a separate watcher goroutine instead of checking for timeout here
-            closeConnection(true)
-            return
-        }
 
         if receive(connection, messageBuffer, &disconnected) {
             switch processClientMessage(connectionId, messageBuffer) {
@@ -256,6 +264,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
         }
 
         if disconnected {
+            println("bbb")
             closeConnection(true)
             return
         }

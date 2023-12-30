@@ -241,7 +241,7 @@ func registrationWithCredentialsRequested(connectionId uint32, msg *message) int
 }
 
 func finishRequested(connectionId uint32) int32 {
-    sync.rwMutex.Lock()
+    sync.rwMutex.Lock() // TODO: redundant locks usage here
     deleteConnection(connectionId)
     sync.rwMutex.Unlock()
     return flagFinish
@@ -485,5 +485,3 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     }
     return 0 // not gonna get here
 }
-
-func onConnectionClosed(connectionId uint32) { finishRequested(connectionId) }

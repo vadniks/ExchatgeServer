@@ -31,6 +31,7 @@ type connectedUser struct {
     crypto *xCrypto.Crypto
     user *database.User // nillable
     state uint
+    connectedMillis uint64
 }
 
 type connectionsT struct {
@@ -55,6 +56,7 @@ func addNewConnection(connectionId uint32, connection *goNet.Conn, xxCrypto *xCr
         crypto: xxCrypto,
         user: nil,
         state: stateConnected,
+        connectedMillis: utils.CurrentTimeMillis(),
     }
 
     connections.rwMutex.Unlock()
@@ -150,6 +152,18 @@ func getAuthorizedConnectedUser(userId uint32) (uint32, *database.User) { // nil
     } else {
         return *connectionId, connectedUser.user
     }
+}
+
+func checkConnectionTimeouts(action func(xConnectedUser *connectedUser)) {
+    connections.rwMutex.Lock()
+
+    for _, xConnectedUser := range connections.connectedUsers {
+        if utils.CurrentTimeMillis() - xConnectedUser.connectedMillis > net.maxTimeMillisToPreserveActiveConnection {
+            action(xConnectedUser)
+        }
+    }
+
+    connections.rwMutex.Unlock()
 }
 
 func deleteConnection(connectionId uint32) bool { // returns true on success
