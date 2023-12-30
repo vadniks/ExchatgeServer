@@ -41,6 +41,10 @@ func checkDatabaseAvailability(url string) bool {
     return err == nil && strings.Contains(string(out), "MongoDB")
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// REMEMBER TO DISABLE THAT F*** GoFMT IN IDE'S SETTINGS! HIS STYLE IS AWFUL! //
+////////////////////////////////////////////////////////////////////////////////
+
 func main() {
     print("\033[1;32m" +
     "_______ _     _ _______ _     _ _______ _______  ______ _______\n" +
