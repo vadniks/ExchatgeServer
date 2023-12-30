@@ -19,298 +19,335 @@
 package net
 
 import (
-    "ExchatgeServer/crypto"
-    "ExchatgeServer/idsPool"
-    "ExchatgeServer/utils"
-    "fmt"
-    goNet "net"
-    goSync "sync"
-    "sync/atomic"
-    "time"
-"unsafe"
+	"ExchatgeServer/crypto"
+	"ExchatgeServer/idsPool"
+	"ExchatgeServer/utils"
+	"fmt"
+	goNet "net"
+	goSync "sync"
+	"sync/atomic"
+	"time"
+	"unsafe"
 )
 
 const intSize = 4
 const longSize = 8
 
-const messageSize uint = 1 << 10 // exactly 1 kB
-const messageHeadSize = intSize * 6 + longSize + crypto.TokenSize // 96
-const messageBodySize = messageSize - messageHeadSize // 928
-const userInfoSize = intSize + 1/*sizeof(bool)*/ + usernameSize // 21
+const messageSize uint = 1 << 10                                 // exactly 1 kB
+const messageHeadSize = intSize*6 + longSize + crypto.TokenSize  // 96
+const messageBodySize = messageSize - messageHeadSize            // 928
+const userInfoSize = intSize + 1 /*sizeof(bool)*/ + usernameSize // 21
 
 type netT struct {
-    maxTimeMillisToPreserveActiveConnection uint64
-    maxTimeMillisIntervalBetweenMessages uint64
-    serverPublicKey []byte
-    serverSecretKey []byte
-    messageBufferSize uint
-    connectionIdsPool *idsPool.IdsPool
+	maxTimeMillisToPreserveActiveConnection uint64
+	maxTimeMillisIntervalBetweenMessages    uint64
+	serverPublicKey                         []byte
+	serverSecretKey                         []byte
+	messageBufferSize                       uint
+	connectionIdsPool                       *idsPool.IdsPool
 }
+
 var net *netT = nil
 
 type message struct {
-    flag int32
-    timestamp uint64
-    size uint32
-    index uint32
-    count uint32
-    from uint32
-    to uint32
-    token [crypto.TokenSize]byte
-    body [messageBodySize]byte // TODO: generate permanent encryption key for each conversation and store encrypted messages in a database
+	flag      int32
+	timestamp uint64
+	size      uint32
+	index     uint32
+	count     uint32
+	from      uint32
+	to        uint32
+	token     [crypto.TokenSize]byte
+	body      [messageBodySize]byte // TODO: generate permanent encryption key for each conversation and store encrypted messages in a database
 }
 
 type userInfo struct {
-    id uint32
-    connected bool
-    name [usernameSize]byte
+	id        uint32
+	connected bool
+	name      [usernameSize]byte
 }
 
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
 func (msg *message) pack() []byte {
-    utils.Assert(msg != nil)
-    bytes := make([]byte, messageSize)
+	utils.Assert(msg != nil)
+	bytes := make([]byte, messageSize)
 
-    copy(unsafe.Slice(&(bytes[0]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.flag))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize]), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.timestamp))), longSize))
-    copy(unsafe.Slice(&(bytes[intSize + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.size))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.index))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.count))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 4 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.from))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 5 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.to))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize * 6 + longSize]), crypto.TokenSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.token))), crypto.TokenSize))
+	copy(unsafe.Slice(&(bytes[0]), intSize), unsafe.Slice((*byte)(unsafe.Pointer(&(msg.flag))), intSize))
+	copy(unsafe.Slice(&(bytes[intSize]), longSize), unsafe.Slice((*byte)(unsafe.Pointer(&(msg.timestamp))), longSize))
+	copy(unsafe.Slice(&(bytes[intSize+longSize]), intSize), unsafe.Slice((*byte)(unsafe.Pointer(&(msg.size))), intSize))
+	copy(unsafe.Slice(&(bytes[intSize*2+longSize]), intSize), unsafe.Slice((*byte)(unsafe.Pointer(&(msg.index))), intSize))
+	copy(unsafe.Slice(&(bytes[intSize*3+longSize]), intSize), unsafe.Slice((*byte)(unsafe.Pointer(&(msg.count))), intSize))
+	copy(unsafe.Slice(&(bytes[intSize*4+longSize]), intSize), unsafe.Slice((*byte)(unsafe.Pointer(&(msg.from))), intSize))
+	copy(unsafe.Slice(&(bytes[intSize*5+longSize]), intSize), unsafe.Slice((*byte)(unsafe.Pointer(&(msg.to))), intSize))
+	copy(unsafe.Slice(&(bytes[intSize*6+longSize]), crypto.TokenSize), unsafe.Slice((*byte)(unsafe.Pointer(&(msg.token))), crypto.TokenSize))
 
-    copy(unsafe.Slice(&(bytes[messageHeadSize]), messageBodySize), unsafe.Slice(&(msg.body[0]), messageBodySize))
-    return bytes
+	copy(unsafe.Slice(&(bytes[messageHeadSize]), messageBodySize), unsafe.Slice(&(msg.body[0]), messageBodySize))
+	return bytes
 }
 
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
 func unpackMessage(bytes []byte) *message {
-    utils.Assert(len(bytes) > 0)
-    message := new(message) // TODO: make generic lambda to copy bytes
+	utils.Assert(len(bytes) > 0)
+	message := new(message) // TODO: make generic lambda to copy bytes
 
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), intSize), unsafe.Slice(&(bytes[0]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.timestamp))), longSize), unsafe.Slice(&(bytes[intSize]), longSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), intSize), unsafe.Slice(&(bytes[intSize + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), intSize), unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), intSize), unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.from))), intSize), unsafe.Slice(&(bytes[intSize * 4 + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.to))), intSize), unsafe.Slice(&(bytes[intSize * 5 + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.token))), crypto.TokenSize), unsafe.Slice(&(bytes[intSize * 6 + longSize]), crypto.TokenSize))
+	copy(unsafe.Slice((*byte)(unsafe.Pointer(&(message.flag))), intSize), unsafe.Slice(&(bytes[0]), intSize))
+	copy(unsafe.Slice((*byte)(unsafe.Pointer(&(message.timestamp))), longSize), unsafe.Slice(&(bytes[intSize]), longSize))
+	copy(unsafe.Slice((*byte)(unsafe.Pointer(&(message.size))), intSize), unsafe.Slice(&(bytes[intSize+longSize]), intSize))
+	copy(unsafe.Slice((*byte)(unsafe.Pointer(&(message.index))), intSize), unsafe.Slice(&(bytes[intSize*2+longSize]), intSize))
+	copy(unsafe.Slice((*byte)(unsafe.Pointer(&(message.count))), intSize), unsafe.Slice(&(bytes[intSize*3+longSize]), intSize))
+	copy(unsafe.Slice((*byte)(unsafe.Pointer(&(message.from))), intSize), unsafe.Slice(&(bytes[intSize*4+longSize]), intSize))
+	copy(unsafe.Slice((*byte)(unsafe.Pointer(&(message.to))), intSize), unsafe.Slice(&(bytes[intSize*5+longSize]), intSize))
+	copy(unsafe.Slice((*byte)(unsafe.Pointer(&(message.token))), crypto.TokenSize), unsafe.Slice(&(bytes[intSize*6+longSize]), crypto.TokenSize))
 
-    copy(unsafe.Slice(&(message.body[0]), messageBodySize), unsafe.Slice(&(bytes[messageHeadSize]), messageBodySize))
-    return message
+	copy(unsafe.Slice(&(message.body[0]), messageBodySize), unsafe.Slice(&(bytes[messageHeadSize]), messageBodySize))
+	return message
 }
 
 //goland:noinspection GoRedundantConversion
 func (xUserInfo *userInfo) pack() []byte {
-    utils.Assert(unsafe.Sizeof(false) == 1)
-    bytes := make([]byte, userInfoSize)
+	utils.Assert(unsafe.Sizeof(false) == 1)
+	bytes := make([]byte, userInfoSize)
 
-    copy(unsafe.Slice(&(bytes[0]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.id))), intSize))
-    copy(unsafe.Slice(&(bytes[intSize]), 1), unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.connected))), 1))
-    copy(unsafe.Slice(&(bytes[intSize + 1]), usernameSize), unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.name))), usernameSize))
+	copy(unsafe.Slice(&(bytes[0]), intSize), unsafe.Slice((*byte)(unsafe.Pointer(&(xUserInfo.id))), intSize))
+	copy(unsafe.Slice(&(bytes[intSize]), 1), unsafe.Slice((*byte)(unsafe.Pointer(&(xUserInfo.connected))), 1))
+	copy(unsafe.Slice(&(bytes[intSize+1]), usernameSize), unsafe.Slice((*byte)(unsafe.Pointer(&(xUserInfo.name))), usernameSize))
 
-    return bytes
+	return bytes
 }
 
 func Initialize(maxUsersCount uint, maxTimeMillisToPreserveActiveConnection uint, maxTimeMillisIntervalBetweenMessages uint) {
-    var byteOrderChecker uint64 = 0x0123456789abcdef // only on x64 littleEndian data marshalling will work as clients expect
-    utils.Assert(unsafe.Sizeof(uintptr(0)) == 8 && *((*uint8) (unsafe.Pointer(&byteOrderChecker))) == 0xef)
+	var byteOrderChecker uint64 = 0x0123456789abcdef // only on x64 littleEndian data marshalling will work as clients expect
+	utils.Assert(unsafe.Sizeof(uintptr(0)) == 8 && *((*uint8)(unsafe.Pointer(&byteOrderChecker))) == 0xef)
 
-    serverPublicKey, serverSecretKey := crypto.GenerateServerKeys()
+	serverPublicKey, serverSecretKey := crypto.GenerateServerKeys()
 
-    net = &netT{
-        uint64(maxTimeMillisToPreserveActiveConnection),
-        uint64(maxTimeMillisIntervalBetweenMessages),
-       serverPublicKey,
-       serverSecretKey,
-       crypto.EncryptedSize(messageSize),
-        idsPool.InitIdsPool(uint32(maxUsersCount)),
-    }
+	net = &netT{
+		uint64(maxTimeMillisToPreserveActiveConnection),
+		uint64(maxTimeMillisIntervalBetweenMessages),
+		serverPublicKey,
+		serverSecretKey,
+		crypto.EncryptedSize(messageSize),
+		idsPool.InitIdsPool(uint32(maxUsersCount)),
+	}
 
-    syncInitialize(maxUsersCount)
+	syncInitialize(maxUsersCount)
 }
 
 func ProcessClients(host string, port uint) {
-    utils.Assert(net != nil)
-    listener, err := goNet.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
-    utils.Assert(err == nil)
+	utils.Assert(net != nil)
+	listener, err := goNet.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
+	utils.Assert(err == nil)
 
-    var waitGroup goSync.WaitGroup
+	var waitGroup goSync.WaitGroup
 
-    var acceptingClients atomic.Bool
-    acceptingClients.Store(true)
+	var acceptingClients atomic.Bool
+	acceptingClients.Store(true)
 
-    onShutDownRequested := func() {
-        acceptingClients.Store(false)
-        utils.Assert(listener.Close() == nil)
-        waitGroup.Wait()
-    }
+	onShutDownRequested := func() {
+		acceptingClients.Store(false)
+		utils.Assert(listener.Close() == nil)
+		waitGroup.Wait()
+	}
 
-    go watchConnectionTimeouts(&acceptingClients)
+	go watchConnectionTimeouts(&acceptingClients, &waitGroup)
 
-    var connectionId uint32 = 0
-    for acceptingClients.Load() { // TODO: forbid logging in with credentials of an user which has already logged in and is still connected
+	var connectionId uint32 = 0
+	for acceptingClients.Load() { // TODO: forbid logging in with credentials of an user which has already logged in and is still connected
 
-        if connectionIdPtr := net.connectionIdsPool.TakeId(); connectionIdPtr == nil {
-            sendDenialOfService(listener)
-            continue
-        } else {
-            connectionId = *connectionIdPtr
-        }
+		if connectionIdPtr := net.connectionIdsPool.TakeId(); connectionIdPtr == nil {
+			sendDenialOfService(listener)
+			continue
+		} else {
+			connectionId = *connectionIdPtr
+		}
 
-        connection, err := listener.Accept()
-        if err != nil { break }
+		connection, err := listener.Accept()
+		if err != nil {
+			break
+		}
 
-        waitGroup.Add(1)
-        go processClient(&connection, connectionId, &waitGroup, &onShutDownRequested)
-    }
+		waitGroup.Add(1)
+		go processClient(&connection, connectionId, &waitGroup, &onShutDownRequested)
+	}
 }
 
 func sendDenialOfService(listener goNet.Listener) {
-    connection, err := listener.Accept()
-    utils.Assert(err == nil)
+	connection, err := listener.Accept()
+	utils.Assert(err == nil)
 
-    send(&connection, crypto.Sign(make([]byte, crypto.KeySize)))
+	send(&connection, crypto.Sign(make([]byte, crypto.KeySize)))
 
-    err = connection.Close()
-    utils.Assert(err == nil)
+	err = connection.Close()
+	utils.Assert(err == nil)
 }
 
-func watchConnectionTimeouts(acceptingClients *atomic.Bool) {
-    for acceptingClients.Load() {
-        checkConnectionTimeouts(func(xConnectedUser *connectedUser) {
-            println("aaa")
-            utils.Assert((*(xConnectedUser.connection)).Close() == nil)
-        })
-    }
+func watchConnectionTimeouts(acceptingClients *atomic.Bool, waitGroup *goSync.WaitGroup) {
+	type pair struct {
+		connectionId   uint32
+		xConnectedUser *connectedUser
+	}
+
+	for acceptingClients.Load() {
+		var connectionsToDelete []*pair
+
+		checkConnectionTimeouts(func(connectionId uint32, xConnectedUser *connectedUser) {
+			println("aaa")
+			connectionsToDelete = append(connectionsToDelete, &pair{connectionId, xConnectedUser})
+		})
+
+		for i := range connectionsToDelete {
+			if getConnectedUser(connectionsToDelete[i].connectionId) == nil {
+				continue
+			}
+			deleteConnection(connectionsToDelete[i].connectionId)
+			closeConnectionShared(connectionsToDelete[i].connectionId, waitGroup)
+			utils.Assert((*(connectionsToDelete[i].xConnectedUser.connection)).Close() == nil)
+		}
+
+		time.Sleep(1e+8)
+	}
 }
 
 func updateConnectionIdleTimeout(connection *goNet.Conn) {
-    err := (*connection).SetDeadline(time.UnixMilli(int64(utils.CurrentTimeMillis()) + int64(net.maxTimeMillisIntervalBetweenMessages)))
-    utils.Assert(err == nil)
+	err := (*connection).SetDeadline(time.UnixMilli(int64(utils.CurrentTimeMillis()) + int64(net.maxTimeMillisIntervalBetweenMessages)))
+	utils.Assert(err == nil)
+}
+
+func closeConnectionShared(connectionId uint32, waitGroup *goSync.WaitGroup) {
+	net.connectionIdsPool.ReturnId(connectionId)
+	waitGroup.Done()
 }
 
 func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSync.WaitGroup, onShutDownRequested *func()) {
-    utils.Assert(waitGroup != nil && onShutDownRequested != nil)
+	utils.Assert(waitGroup != nil && onShutDownRequested != nil)
 
-    updateConnectionIdleTimeout(connection)
+	updateConnectionIdleTimeout(connection)
 
-    closeConnection := func(disconnectedByClient bool) {
-        if disconnectedByClient {
-            utils.Assert(getConnectedUser(connectionId) != nil)
-            deleteConnection(connectionId)
-        } else {
-            utils.Assert(getConnectedUser(connectionId) == nil)
-        }
+	closeConnection := func(disconnectedByClient bool) {
+		println("ccc")
 
-        net.connectionIdsPool.ReturnId(connectionId)
-        waitGroup.Done()
+		if disconnectedByClient {
+			if getConnectedUser(connectionId) == nil {
+				return
+			}
+			deleteConnection(connectionId)
+		} else {
+			utils.Assert(getConnectedUser(connectionId) == nil)
+		}
 
-        println("ccc")
+		closeConnectionShared(connectionId, waitGroup)
 
-        a := (*connection).Close()
-        if a != nil { panic(a.Error()) }
-    }
+		a := (*connection).Close()
+		if a != nil {
+			panic(a.Error())
+		}
+	}
 
-    send(connection, crypto.Sign(net.serverPublicKey))
+	send(connection, crypto.Sign(net.serverPublicKey))
 
-    clientPublicKey := make([]byte, crypto.KeySize)
-    if !receive(connection, clientPublicKey, nil) {
-        closeConnection(false)
-        return
-    }
+	clientPublicKey := make([]byte, crypto.KeySize)
+	if !receive(connection, clientPublicKey, nil) {
+		closeConnection(false)
+		return
+	}
 
-    serverKey, clientKey := crypto.ExchangeKeys(net.serverPublicKey, net.serverSecretKey, clientPublicKey)
-    if serverKey == nil || clientKey == nil {
-        closeConnection(false)
-        return
-    }
+	serverKey, clientKey := crypto.ExchangeKeys(net.serverPublicKey, net.serverSecretKey, clientPublicKey)
+	if serverKey == nil || clientKey == nil {
+		closeConnection(false)
+		return
+	}
 
-    serverStreamHeader, xCrypto := crypto.CreateEncoderStream(serverKey)
-    send(connection, crypto.Sign(serverStreamHeader))
+	serverStreamHeader, xCrypto := crypto.CreateEncoderStream(serverKey)
+	send(connection, crypto.Sign(serverStreamHeader))
 
-    clientStreamHeader := make([]byte, crypto.HeaderSize)
-    if !receive(connection, clientStreamHeader, nil) {
-        closeConnection(false)
-        return
-    }
+	clientStreamHeader := make([]byte, crypto.HeaderSize)
+	if !receive(connection, clientStreamHeader, nil) {
+		closeConnection(false)
+		return
+	}
 
-    if !xCrypto.CreateDecoderStream(clientKey, clientStreamHeader) {
-        closeConnection(false)
-        return
-    }
+	if !xCrypto.CreateDecoderStream(clientKey, clientStreamHeader) {
+		closeConnection(false)
+		return
+	}
 
-    addNewConnection(connectionId, connection, xCrypto)
+	addNewConnection(connectionId, connection, xCrypto)
 
-    messageBuffer := make([]byte, net.messageBufferSize)
-    for {
-        disconnected := false
+	messageBuffer := make([]byte, net.messageBufferSize)
+	for {
+		disconnected := false
 
-        if receive(connection, messageBuffer, &disconnected) {
-            switch processClientMessage(connectionId, messageBuffer) {
-                case flagFinishToReconnect: fallthrough
-                case flagFinishWithError: fallthrough
-                case flagFinish:
-                    closeConnection(false)
-                    return
-                case flagShutdown:
-                    closeConnection(false)
-                    (*onShutDownRequested)()
-                    return
-                default: {}
-            }
-        }
+		if receive(connection, messageBuffer, &disconnected) {
+			switch processClientMessage(connectionId, messageBuffer) {
+			case flagFinishToReconnect:
+				fallthrough
+			case flagFinishWithError:
+				fallthrough
+			case flagFinish:
+				closeConnection(false)
+				return
+			case flagShutdown:
+				closeConnection(false)
+				(*onShutDownRequested)()
+				return
+			default:
+				{
+				}
+			}
+		}
 
-        if disconnected {
-            println("bbb")
-            closeConnection(true)
-            return
-        }
-    }
+		if disconnected {
+			println("bbb")
+			closeConnection(true)
+			return
+		}
+	}
 }
 
 func send(connection *goNet.Conn, payload []byte) {
-    utils.Assert(connection != nil && len(payload) > 0)
+	utils.Assert(connection != nil && len(payload) > 0)
 
-    count, err := (*connection).Write(payload)
-    utils.Assert(count == len(payload) && err == nil)
+	count, err := (*connection).Write(payload)
+	utils.Assert(count == len(payload) && err == nil)
 
-    updateConnectionIdleTimeout(connection)
+	updateConnectionIdleTimeout(connection)
 }
 
-func receive(connection *goNet.Conn, buffer []byte, /*nillable*/ error *bool) bool {
-    utils.Assert(connection != nil && len(buffer) > 0)
+func receive(connection *goNet.Conn, buffer []byte /*nillable*/, error *bool) bool {
+	utils.Assert(connection != nil && len(buffer) > 0)
 
-    count, err := (*connection).Read(buffer)
-    if error != nil { *error = err != nil }
-    if err != nil { return false }
+	count, err := (*connection).Read(buffer)
+	if error != nil {
+		*error = err != nil
+	}
+	if err != nil {
+		return false
+	}
 
-    updateConnectionIdleTimeout(connection)
+	updateConnectionIdleTimeout(connection)
 
-    return count == len(buffer)
+	return count == len(buffer)
 }
 
 func processClientMessage(connectionId uint32, messageBytes []byte) int32 {
-    xCrypto := getCrypto(connectionId)
-    utils.Assert(xCrypto != nil && len(messageBytes) > 0)
+	xCrypto := getCrypto(connectionId)
+	utils.Assert(xCrypto != nil && len(messageBytes) > 0)
 
-    decrypted := xCrypto.Decrypt(messageBytes)
-    message := unpackMessage(decrypted)
+	decrypted := xCrypto.Decrypt(messageBytes)
+	message := unpackMessage(decrypted)
 
-    return routeMessage(connectionId, message)
+	return routeMessage(connectionId, message)
 }
 
 func sendMessage(connectionId uint32, msg *message) {
-    xCrypto := getCrypto(connectionId)
-    utils.Assert(msg != nil && xCrypto != nil)
+	xCrypto := getCrypto(connectionId)
+	utils.Assert(msg != nil && xCrypto != nil)
 
-    connection := getConnection(connectionId)
-    utils.Assert(connection != nil)
+	connection := getConnection(connectionId)
+	utils.Assert(connection != nil)
 
-    packed := msg.pack()
-    encrypted := xCrypto.Encrypt(packed)
+	packed := msg.pack()
+	encrypted := xCrypto.Encrypt(packed)
 
-    send(connection, encrypted)
+	send(connection, encrypted)
 }
