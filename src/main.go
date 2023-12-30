@@ -31,7 +31,7 @@ import (
     "time"
 )
 
-const databaseAvailabilityCheckMaxTries = 10 // 10 seconds timeout
+const databaseAvailabilityCheckMaxTries = 10 // at most 10 seconds timeout
 
 func checkDatabaseAvailability(url string) bool {
     cmd := exec.Command("curl", "-f", url)
