@@ -235,9 +235,12 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
     for {
         disconnected := false
 
-        if utils.CurrentTimeMillis() - connectedAt < net.maxTimeMillisToPreserveActiveConnection &&
-            receive(connection, messageBuffer, &disconnected) {
+        if utils.CurrentTimeMillis() - connectedAt > net.maxTimeMillisToPreserveActiveConnection { // TODO: interrupt the goroutine when timeout exceeds instead of checking for it here
+            closeConnection(true)
+            return
+        }
 
+        if receive(connection, messageBuffer, &disconnected) {
             switch processClientMessage(connectionId, messageBuffer) {
                 case flagFinishToReconnect: fallthrough
                 case flagFinishWithError: fallthrough
