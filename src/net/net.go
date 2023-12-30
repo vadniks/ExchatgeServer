@@ -235,7 +235,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
     for {
         disconnected := false
 
-        if utils.CurrentTimeMillis() - connectedAt > net.maxTimeMillisToPreserveActiveConnection { // TODO: interrupt the goroutine when timeout exceeds instead of checking for it here
+        if utils.CurrentTimeMillis() - connectedAt > net.maxTimeMillisToPreserveActiveConnection { // TODO: interrupt each goroutine when it's timeout exceeds in a separate watcher goroutine instead of checking for timeout here
             closeConnection(true)
             return
         }
