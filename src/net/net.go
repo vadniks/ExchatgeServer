@@ -251,7 +251,6 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
         }
 
         if disconnected {
-            println("disconnected")
             closeConnection(true)
             return
         }
