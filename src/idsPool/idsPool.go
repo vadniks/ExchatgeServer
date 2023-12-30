@@ -69,7 +69,7 @@ func (pool *IdsPool) SetId(id uint32, taken bool) {
 func (pool *IdsPool) TakeId() *uint32 { // nillable result
     pool.mutex.Lock()
 
-    for i := uint32(0); i < pool.size; i++ { // TODO: binary search
+    for i := uint32(0); i < pool.size; i++ {
         if pool.ids.Bit(int(i)) == uint(xFalse) {
             pool.ids.SetBit(&(pool.ids), int(i), uint(xTrue))
             pool.mutex.Unlock()
