@@ -240,7 +240,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
             return
         }
 
-        if receive(connection, messageBuffer, &disconnected) {
+        if receive(connection, messageBuffer, &disconnected/*, connectedAt // TODO*/) {
             switch processClientMessage(connectionId, messageBuffer) {
                 case flagFinishToReconnect: fallthrough
                 case flagFinishWithError: fallthrough
