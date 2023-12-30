@@ -123,9 +123,9 @@ func Initialize(maxUsersCount uint, maxTimeMillisToPreserveActiveConnection uint
     net = &netT{
         uint64(maxTimeMillisToPreserveActiveConnection),
         uint64(maxTimeMillisIntervalBetweenMessages),
-       serverPublicKey,
-       serverSecretKey,
-       crypto.EncryptedSize(messageSize),
+        serverPublicKey,
+        serverSecretKey,
+        crypto.EncryptedSize(messageSize),
         idsPool.InitIdsPool(uint32(maxUsersCount)),
     }
 
@@ -181,9 +181,9 @@ func sendDenialOfService(listener goNet.Listener) {
 func watchConnectionTimeouts(acceptingClients *atomic.Bool) {
     for acceptingClients.Load() {
         checkConnectionTimeouts(func(xConnectedUser *connectedUser) {
-            println("aaa")
-            utils.Assert((*(xConnectedUser.connection)).Close() == nil)
+            utils.Assert((*(xConnectedUser.connection)).SetDeadline(time.UnixMilli(int64(utils.CurrentTimeMillis() + 100))) == nil)
         })
+        time.Sleep(1e+8)
     }
 }
 
@@ -208,10 +208,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
         net.connectionIdsPool.ReturnId(connectionId)
         waitGroup.Done()
 
-        println("ccc")
-
-        a := (*connection).Close()
-        if a != nil { panic(a.Error()) }
+        utils.Assert((*connection).Close() == nil)
     }
 
     send(connection, crypto.Sign(net.serverPublicKey))
@@ -264,7 +261,6 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
         }
 
         if disconnected {
-            println("bbb")
             closeConnection(true)
             return
         }

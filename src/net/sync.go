@@ -414,7 +414,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
 
     if flag == flagLogIn || flag == flagRegister {
         utils.Assert(
-            *state == 0 && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
+            *state == stateConnected && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
             msg.from == fromAnonymous &&
             xConnectionId == nil &&
             userIdFromToken == nil &&
@@ -424,7 +424,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
         setConnectionState(connectionId, stateSecureConnectionEstablished)
     } else {
         utils.Assert(
-            *state > 0 &&
+            *state > stateConnected &&
             userId != nil &&
             msg.from != fromAnonymous &&
             msg.from != fromServer,

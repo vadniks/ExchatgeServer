@@ -92,7 +92,7 @@ func Init(secretKeySize uint, maxPasswordSize uint) *Options { // nillable // TO
                 if len(options.AdminPassword) == 0 { return nil }
             case maxTimeMillisToPreserveActiveConnection:
                 options.MaxTimeMillisToPreserveActiveConnection = parseMaxTimeMillisToPreserveActiveConnection(value)
-                if options.MaxTimeMillisToPreserveActiveConnection == 0 { return nil }
+                if options.MaxTimeMillisToPreserveActiveConnection == 0 { return nil } // TODO: verify correctness of these options
             case maxTimeMillisIntervalBetweenMessages:
                 options.MaxTimeMillisIntervalBetweenMessages = parseMaxTimeMillisIntervalBetweenMessages(value)
                 if options.MaxTimeMillisIntervalBetweenMessages == 0 { return nil }
