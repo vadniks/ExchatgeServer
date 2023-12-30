@@ -24,9 +24,11 @@ import (
     "ExchatgeServer/net"
     "ExchatgeServer/options"
     "ExchatgeServer/utils"
-    "os"
+    "fmt"
+"os"
     "os/exec"
     "strings"
+    "time"
 )
 
 func main() {
@@ -49,10 +51,19 @@ func main() {
     utils.Assert(cmd.Err == nil)
     out, err := cmd.Output()
 
-    if err != nil || !strings.Contains(string(out), "MongoDB") {
-        println("cannot connect to the database, exiting...")
-        os.Exit(1)
-        return
+    counter := 0
+    const maxTries = 10
+    for err != nil || !strings.Contains(string(out), "MongoDB") {
+        if counter >= maxTries {
+            println("timeout exceeded, exiting...")
+            os.Exit(1)
+            return
+        } else {
+            fmt.Printf("waiting for the database to become available (%d/%d)...\n", counter, maxTries)
+        }
+
+        counter++
+        time.Sleep(1e+9) // 1 second = 1000 milliseconds = 1 000 000 000 nanoseconds
     }
 
     crypto.Initialize(xOptions.ServerPrivateSignKey)
