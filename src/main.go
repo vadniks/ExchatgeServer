@@ -72,7 +72,7 @@ func main() {
         }
 
         counter++
-        time.Sleep(1e+9) // 1 second = 1000 milliseconds = 1 000 000 000 nanoseconds
+        time.Sleep(1e9) // 1 second = 1000 milliseconds = 1 000 000 000 nanoseconds
     }
 
     crypto.Initialize(xOptions.ServerPrivateSignKey)

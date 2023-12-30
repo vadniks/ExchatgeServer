@@ -183,7 +183,7 @@ func watchConnectionTimeouts(acceptingClients *atomic.Bool) {
         checkConnectionTimeouts(func(xConnectedUser *connectedUser) {
             utils.Assert((*(xConnectedUser.connection)).SetDeadline(time.UnixMilli(int64(utils.CurrentTimeMillis() + 100))) == nil)
         })
-        time.Sleep(1e+8) // 100 milliseconds = 100 * 1000 000 nanoseconds = 0.1 seconds
+        time.Sleep(1e8) // 100 milliseconds = 100 * 1000 000 nanoseconds = 0.1 seconds
     }
 }
 
