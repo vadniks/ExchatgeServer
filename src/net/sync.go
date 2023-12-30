@@ -19,12 +19,12 @@
 package net
 
 import (
-    "ExchatgeServer/crypto"
-    "ExchatgeServer/database"
-    "ExchatgeServer/utils"
-    "math"
-    goSync "sync"
-    "unsafe"
+	"ExchatgeServer/crypto"
+	"ExchatgeServer/database"
+	"ExchatgeServer/utils"
+	"math"
+	goSync "sync"
+	"unsafe"
 )
 
 const flagProceed int32 = 0x00000000
@@ -64,424 +64,451 @@ const fromAnonymous uint32 = 0xffffffff
 const fromServer uint32 = 0x7fffffff
 
 type syncT struct {
-    maxUsersCount uint32
-    tokenAnonymous []byte
-    tokenServer [crypto.TokenSize]byte
-    bodyStub [messageBodySize]byte
-    rwMutex goSync.RWMutex
-    shuttingDown bool
+	maxUsersCount  uint32
+	tokenAnonymous []byte
+	tokenServer    [crypto.TokenSize]byte
+	bodyStub       [messageBodySize]byte
+	rwMutex        goSync.RWMutex
+	shuttingDown   bool
 }
 
 var sync *syncT = nil
 
 func syncInitialize(maxUsersCount uint) {
-    sync = &syncT{
-        uint32(maxUsersCount),
-        make([]byte, crypto.TokenSize), // all zeroes
-        crypto.MakeServerToken(messageBodySize),
-        [messageBodySize]byte{}, // all zeroes,
-        goSync.RWMutex{},
-        false,
-    }
+	sync = &syncT{
+		uint32(maxUsersCount),
+		make([]byte, crypto.TokenSize), // all zeroes
+		crypto.MakeServerToken(messageBodySize),
+		[messageBodySize]byte{}, // all zeroes,
+		goSync.RWMutex{},
+		false,
+	}
 }
 
 func simpleServerMessage(xFlag int32, xTo uint32) *message {
-    return &message{
-        flag: xFlag,
-        timestamp: utils.CurrentTimeMillis(),
-        size: 0,
-        index: 0,
-        count: 1,
-        from: fromServer,
-        to: xTo,
-        token: sync.tokenServer,
-        body: sync.bodyStub,
-    }
+	return &message{
+		flag:      xFlag,
+		timestamp: utils.CurrentTimeMillis(),
+		size:      0,
+		index:     0,
+		count:     1,
+		from:      fromServer,
+		to:        xTo,
+		token:     sync.tokenServer,
+		body:      sync.bodyStub,
+	}
 }
 
 func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
-    bodySize := len(xBody)
-    utils.Assert(bodySize > 0 && bodySize <= int(messageBodySize))
+	bodySize := len(xBody)
+	utils.Assert(bodySize > 0 && bodySize <= int(messageBodySize))
 
-    result := &message{
-        flag: xFlag,
-        timestamp: utils.CurrentTimeMillis(),
-        size: uint32(bodySize),
-        index: 0,
-        count: 1,
-        from: fromServer,
-        to: xTo,
-        token: sync.tokenServer,
-    }
+	result := &message{
+		flag:      xFlag,
+		timestamp: utils.CurrentTimeMillis(),
+		size:      uint32(bodySize),
+		index:     0,
+		count:     1,
+		from:      fromServer,
+		to:        xTo,
+		token:     sync.tokenServer,
+	}
 
-    copy(unsafe.Slice(&(result.body[0]), messageBodySize), xBody)
-    return result
+	copy(unsafe.Slice(&(result.body[0]), messageBodySize), xBody)
+	return result
 }
 
 func shutdownRequested(connectionId uint32, user *database.User, msg *message) int32 { // TODO: add more administrative actions, such as: logging in and registration blocking, user ban...
-    utils.Assert(user != nil && msg.to == toServer)
+	utils.Assert(user != nil && msg.to == toServer)
 
-    if !database.IsAdmin(user) {
-        sendMessage(connectionId, simpleServerMessage(flagAccessDenied, user.Id))
-        return flagProceed
-    }
+	if !database.IsAdmin(user) {
+		sendMessage(connectionId, simpleServerMessage(flagAccessDenied, user.Id))
+		return flagProceed
+	}
 
-    finishRequested(connectionId)
+	finishRequested(connectionId)
 
-    sync.rwMutex.Lock()
-    sync.shuttingDown = true
-    sync.rwMutex.Unlock()
+	sync.rwMutex.Lock()
+	sync.shuttingDown = true
+	sync.rwMutex.Unlock()
 
-    sync.rwMutex.Lock()
-    database.DeleteAllMessagesFromAllUsers()
-    sync.rwMutex.Unlock()
+	sync.rwMutex.Lock()
+	database.DeleteAllMessagesFromAllUsers()
+	sync.rwMutex.Unlock()
 
-    return flagShutdown
+	return flagShutdown
 }
 
 //goland:noinspection GoRedundantConversion (*byte) - just silence that annoying warning already!
 func proceedRequested(msg *message) int32 {
-    utils.Assert(msg != nil && msg.to != msg.from)
+	utils.Assert(msg != nil && msg.to != msg.from)
 
-    if toUserConnectionId, toUser := getAuthorizedConnectedUser(msg.to); toUser != nil {
-        sendMessage(toUserConnectionId, msg)
-    } // else user offline or doesn't exist
+	if toUserConnectionId, toUser := getAuthorizedConnectedUser(msg.to); toUser != nil {
+		sendMessage(toUserConnectionId, msg)
+	} // else user offline or doesn't exist
 
-    sync.rwMutex.Lock()
-    database.AddMessage(msg.timestamp, msg.from, msg.to, msg.body[:msg.size])
-    sync.rwMutex.Unlock()
+	sync.rwMutex.Lock()
+	database.AddMessage(msg.timestamp, msg.from, msg.to, msg.body[:msg.size])
+	sync.rwMutex.Unlock()
 
-    return flagProceed
+	return flagProceed
 }
 
 func parseCredentials(msg *message) (username []byte, unhashedPassword []byte) {
-    utils.Assert(msg != nil && (msg.flag == flagLogIn || msg.flag == flagRegister))
+	utils.Assert(msg != nil && (msg.flag == flagLogIn || msg.flag == flagRegister))
 
-    username = make([]byte, usernameSize)
-    copy(username, unsafe.Slice(&(msg.body[0]), usernameSize))
+	username = make([]byte, usernameSize)
+	copy(username, unsafe.Slice(&(msg.body[0]), usernameSize))
 
-    unhashedPassword = make([]byte, UnhashedPasswordSize)
-    copy(unhashedPassword, unsafe.Slice(&(msg.body[usernameSize]), crypto.HashSize))
+	unhashedPassword = make([]byte, UnhashedPasswordSize)
+	copy(unhashedPassword, unsafe.Slice(&(msg.body[usernameSize]), crypto.HashSize))
 
-    return username, unhashedPassword
+	return username, unhashedPassword
 }
 
 func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 { // expects the password not to be hashed in order to compare it with salted hash (which is always different)
-    utils.Assert(msg != nil)
-    username, unhashedPassword := parseCredentials(msg)
+	utils.Assert(msg != nil)
+	username, unhashedPassword := parseCredentials(msg)
 
-    xUsernameSize := uint(len(username)); passwordSize := uint(len(unhashedPassword))
-    utils.Assert(
-        xUsernameSize > 0 && xUsernameSize <= usernameSize &&
-        passwordSize > 0 && passwordSize <= UnhashedPasswordSize,
-    )
+	xUsernameSize := uint(len(username))
+	passwordSize := uint(len(unhashedPassword))
+	utils.Assert(
+		xUsernameSize > 0 && xUsernameSize <= usernameSize &&
+			passwordSize > 0 && passwordSize <= UnhashedPasswordSize,
+	)
 
-    sync.rwMutex.Lock()
-    user := database.FindUser(username, unhashedPassword)
+	sync.rwMutex.Lock()
+	user := database.FindUser(username, unhashedPassword)
 
-    var connectedUser *database.User = nil
-    if user != nil { _, connectedUser = getAuthorizedConnectedUser(user.Id) }
+	var connectedUser *database.User = nil
+	if user != nil {
+		_, connectedUser = getAuthorizedConnectedUser(user.Id)
+	}
 
-    if user == nil || connectedUser != nil {
-        sync.rwMutex.Unlock()
-        sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
-        finishRequested(connectionId)
-        return flagFinishWithError
-    }
+	if user == nil || connectedUser != nil {
+		sync.rwMutex.Unlock()
+		sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
+		finishRequested(connectionId)
+		return flagFinishWithError
+	}
 
-    setUser(connectionId, user)
-    setConnectionState(connectionId, stateLoggedWithCredentials)
+	setUser(connectionId, user)
+	setConnectionState(connectionId, stateLoggedWithCredentials)
 
-    token := crypto.MakeToken(connectionId, user.Id) // won't compile if inline the variable
-    sync.rwMutex.Unlock()
-    sendMessage(connectionId, serverMessage(flagLoggedIn, user.Id, token[:])) // here's how a client obtains his id
-    return flagProceed
+	token := crypto.MakeToken(connectionId, user.Id) // won't compile if inline the variable
+	sync.rwMutex.Unlock()
+	sendMessage(connectionId, serverMessage(flagLoggedIn, user.Id, token[:])) // here's how a client obtains his id
+	return flagProceed
 }
 
 func registrationWithCredentialsRequested(connectionId uint32, msg *message) int32 {
-    utils.Assert(msg != nil)
+	utils.Assert(msg != nil)
 
-    sync.rwMutex.Lock()
-    if database.GetUsersCount() >= sync.maxUsersCount {
-        sync.rwMutex.Unlock()
-        sendMessage(connectionId, simpleServerMessage(flagError, toAnonymous))
-        finishRequested(connectionId)
-        return flagFinishWithError
-    }
+	sync.rwMutex.Lock()
+	if database.GetUsersCount() >= sync.maxUsersCount {
+		sync.rwMutex.Unlock()
+		sendMessage(connectionId, simpleServerMessage(flagError, toAnonymous))
+		finishRequested(connectionId)
+		return flagFinishWithError
+	}
 
-    countZeroes := func(bytes []byte) uint {
-        var zeroes uint = 0
-        for _, i := range bytes {
-            if i == 0 || i == byte(' ') { zeroes++ }
-        }
-        return zeroes
-    }
+	countZeroes := func(bytes []byte) uint {
+		var zeroes uint = 0
+		for _, i := range bytes {
+			if i == 0 || i == byte(' ') {
+				zeroes++
+			}
+		}
+		return zeroes
+	}
 
-    username, unhashedPassword := parseCredentials(msg)
-    var user *database.User = nil
+	username, unhashedPassword := parseCredentials(msg)
+	var user *database.User = nil
 
-    usernameNonZeroes := usernameSize - countZeroes(username)
-    unhashedPasswordNonZeroes := UnhashedPasswordSize - countZeroes(unhashedPassword)
+	usernameNonZeroes := usernameSize - countZeroes(username)
+	unhashedPasswordNonZeroes := UnhashedPasswordSize - countZeroes(unhashedPassword)
 
-    if usernameNonZeroes >= minCredentialSize && usernameNonZeroes <= usernameSize &&
-        unhashedPasswordNonZeroes >= minCredentialSize && unhashedPasswordNonZeroes <= UnhashedPasswordSize {
-        user = database.AddUser(username, crypto.Hash(unhashedPassword))
-    }
+	if usernameNonZeroes >= minCredentialSize && usernameNonZeroes <= usernameSize &&
+		unhashedPasswordNonZeroes >= minCredentialSize && unhashedPasswordNonZeroes <= UnhashedPasswordSize {
+		user = database.AddUser(username, crypto.Hash(unhashedPassword))
+	}
 
-    successful := user != nil
+	successful := user != nil
 
-    sync.rwMutex.Unlock()
-    sendMessage(connectionId, simpleServerMessage( // Lack of ternary operator is awful
-        func() int32 { if successful { return flagRegistered } else { return flagError } }(),
-        func() uint32 { if successful { return user.Id } else { return toAnonymous } }(),
-    ))
+	sync.rwMutex.Unlock()
+	sendMessage(connectionId, simpleServerMessage( // Lack of ternary operator is awful
+		func() int32 {
+			if successful {
+				return flagRegistered
+			} else {
+				return flagError
+			}
+		}(),
+		func() uint32 {
+			if successful {
+				return user.Id
+			} else {
+				return toAnonymous
+			}
+		}(),
+	))
 
-    finishRequested(connectionId)
-    if successful { return flagFinishToReconnect } else { return flagFinishWithError }
+	finishRequested(connectionId)
+	if successful {
+		return flagFinishToReconnect
+	} else {
+		return flagFinishWithError
+	}
 }
 
 func finishRequested(connectionId uint32) int32 {
-    sync.rwMutex.Lock() // TODO: redundant locks usage here
-    deleteConnection(connectionId)
-    sync.rwMutex.Unlock()
-    return flagFinish
+	sync.rwMutex.Lock() // TODO: redundant locks usage here
+	deleteConnection(connectionId)
+	sync.rwMutex.Unlock()
+	return flagFinish
 }
 
 //goland:noinspection GoRedundantConversion
 func usersListRequested(connectionId uint32, userId uint32) int32 {
-    sync.rwMutex.RLock()
-    registeredUsers := database.GetAllUsers()
-    var userInfosBytes []byte
+	sync.rwMutex.RLock()
+	registeredUsers := database.GetAllUsers()
+	var userInfosBytes []byte
 
-    infosPerMessage := uint32(messageBodySize / userInfoSize)
-    utils.Assert(infosPerMessage <= uint32(messageBodySize))
-    stubBytes := make([]byte, uint32(messageBodySize) - infosPerMessage * uint32(userInfoSize))
+	infosPerMessage := uint32(messageBodySize / userInfoSize)
+	utils.Assert(infosPerMessage <= uint32(messageBodySize))
+	stubBytes := make([]byte, uint32(messageBodySize)-infosPerMessage*uint32(userInfoSize))
 
-    var infosCount uint32 = 0
-    for _, user := range registeredUsers {
-        _, xUser := getAuthorizedConnectedUser(user.Id)
+	var infosCount uint32 = 0
+	for _, user := range registeredUsers {
+		_, xUser := getAuthorizedConnectedUser(user.Id)
 
-        xUserInfo := &userInfo{
-            id: user.Id,
-            connected: xUser != nil,
-            name: [16]byte{},
-        }
-        copy(unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.name))), usernameSize), user.Name)
+		xUserInfo := &userInfo{
+			id:        user.Id,
+			connected: xUser != nil,
+			name:      [16]byte{},
+		}
+		copy(unsafe.Slice((*byte)(unsafe.Pointer(&(xUserInfo.name))), usernameSize), user.Name)
 
-        userInfosBytes = append(userInfosBytes, xUserInfo.pack()...)
-        infosCount++
+		userInfosBytes = append(userInfosBytes, xUserInfo.pack()...)
+		infosCount++
 
-        if infosCount % infosPerMessage == 0 {
-            userInfosBytes = append(userInfosBytes, stubBytes...)
-        }
-    }
+		if infosCount%infosPerMessage == 0 {
+			userInfosBytes = append(userInfosBytes, stubBytes...)
+		}
+	}
 
-    messagesCount := uint32(math.Ceil(float64(infosCount) / float64(infosPerMessage)))
-    totalPayloadBytesSize := messagesCount * uint32(messageBodySize)
-    userInfosBytes = append(userInfosBytes, make([]byte, totalPayloadBytesSize - uint32(len(userInfosBytes)))...)
-    utils.Assert(uint32(len(userInfosBytes)) == totalPayloadBytesSize)
+	messagesCount := uint32(math.Ceil(float64(infosCount) / float64(infosPerMessage)))
+	totalPayloadBytesSize := messagesCount * uint32(messageBodySize)
+	userInfosBytes = append(userInfosBytes, make([]byte, totalPayloadBytesSize-uint32(len(userInfosBytes)))...)
+	utils.Assert(uint32(len(userInfosBytes)) == totalPayloadBytesSize)
 
-    var infosCountInMessage uint32
-    for messageIndex := uint32(0); messageIndex < messagesCount; messageIndex++ {
+	var infosCountInMessage uint32
+	for messageIndex := uint32(0); messageIndex < messagesCount; messageIndex++ {
 
-        if infosCount > infosPerMessage * (messageIndex + 1) {
-            infosCountInMessage = infosPerMessage
-        } else {
-            infosCountInMessage = infosCount - infosPerMessage * messageIndex
-        }
+		if infosCount > infosPerMessage*(messageIndex+1) {
+			infosCountInMessage = infosPerMessage
+		} else {
+			infosCountInMessage = infosCount - infosPerMessage*messageIndex
+		}
 
-        msg := &message{
-            flag: flagFetchUsers,
-            timestamp: utils.CurrentTimeMillis(),
-            size: infosCountInMessage,
-            index: messageIndex,
-            count: messagesCount,
-            from: fromServer,
-            to: userId,
-            token: sync.tokenServer,
-            body: [messageBodySize]byte{},
-        }
+		msg := &message{
+			flag:      flagFetchUsers,
+			timestamp: utils.CurrentTimeMillis(),
+			size:      infosCountInMessage,
+			index:     messageIndex,
+			count:     messagesCount,
+			from:      fromServer,
+			to:        userId,
+			token:     sync.tokenServer,
+			body:      [messageBodySize]byte{},
+		}
 
-        copy(
-           unsafe.Slice((*byte) (unsafe.Pointer(&(msg.body))), messageBodySize),
-           unsafe.Slice((*byte) (unsafe.Pointer(&(userInfosBytes[messageIndex * uint32(messageBodySize)]))), messageBodySize),
-        )
+		copy(
+			unsafe.Slice((*byte)(unsafe.Pointer(&(msg.body))), messageBodySize),
+			unsafe.Slice((*byte)(unsafe.Pointer(&(userInfosBytes[messageIndex*uint32(messageBodySize)]))), messageBodySize),
+		)
 
-        sendMessage(connectionId, msg)
-    }
+		sendMessage(connectionId, msg)
+	}
 
-    sync.rwMutex.RUnlock()
-    return flagProceed
+	sync.rwMutex.RUnlock()
+	return flagProceed
 }
 
 //goland:noinspection GoRedundantConversion
 func messagesRequested(connectionId uint32, msg *message) int32 {
-    const byteSize = 1
-    utils.Assert(unsafe.Sizeof(true) == byteSize)
-    const intSize = unsafe.Sizeof(int32(0))
-    const longSize = unsafe.Sizeof(int64(0))
+	const byteSize = 1
+	utils.Assert(unsafe.Sizeof(true) == byteSize)
+	const intSize = unsafe.Sizeof(int32(0))
+	const longSize = unsafe.Sizeof(int64(0))
 
-    fromMode := msg.body[0]
-    utils.Assert(fromMode == 0 || fromMode == 1)
+	fromMode := msg.body[0]
+	utils.Assert(fromMode == 0 || fromMode == 1)
 
-    var afterTimestamp uint64
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&afterTimestamp)), longSize), unsafe.Slice((*byte) (&(msg.body[byteSize])), longSize))
-    utils.Assert(afterTimestamp < utils.CurrentTimeMillis())
+	var afterTimestamp uint64
+	copy(unsafe.Slice((*byte)(unsafe.Pointer(&afterTimestamp)), longSize), unsafe.Slice((*byte)(&(msg.body[byteSize])), longSize))
+	utils.Assert(afterTimestamp < utils.CurrentTimeMillis())
 
-    var fromUser uint32
-    if fromMode == 0 {
-        fromUser = msg.from
-    } else {
-        copy(unsafe.Slice((*byte) (unsafe.Pointer(&fromUser)), intSize), unsafe.Slice((*byte) (&(msg.body[byteSize + longSize])), intSize))
-        utils.Assert(fromUser < sync.maxUsersCount)
-    }
+	var fromUser uint32
+	if fromMode == 0 {
+		fromUser = msg.from
+	} else {
+		copy(unsafe.Slice((*byte)(unsafe.Pointer(&fromUser)), intSize), unsafe.Slice((*byte)(&(msg.body[byteSize+longSize])), intSize))
+		utils.Assert(fromUser < sync.maxUsersCount)
+	}
 
-    if !database.UserExists(fromUser) {
-        sendMessage(connectionId, simpleServerMessage(flagError, msg.from))
-        return flagError
-    }
+	if !database.UserExists(fromUser) {
+		sendMessage(connectionId, simpleServerMessage(flagError, msg.from))
+		return flagError
+	}
 
-    sync.rwMutex.RLock()
-    messages := database.GetMessagesFromOrForUser(fromMode == 1, fromUser, afterTimestamp)
-    sync.rwMutex.RUnlock()
+	sync.rwMutex.RLock()
+	messages := database.GetMessagesFromOrForUser(fromMode == 1, fromUser, afterTimestamp)
+	sync.rwMutex.RUnlock()
 
-    count := len(messages)
-    var lastMessageTimestamp uint64 = 0
+	count := len(messages)
+	var lastMessageTimestamp uint64 = 0
 
-    if count == 0 {
-        reply := &message{
-            flagFetchMessages,
-            utils.CurrentTimeMillis(),
-            0,
-            0,
-            1,
-            fromServer,
-            msg.from,
-            sync.tokenServer,
-            [messageBodySize]byte{},
-        }
+	if count == 0 {
+		reply := &message{
+			flagFetchMessages,
+			utils.CurrentTimeMillis(),
+			0,
+			0,
+			1,
+			fromServer,
+			msg.from,
+			sync.tokenServer,
+			[messageBodySize]byte{},
+		}
 
-        reply.body[0] = fromMode
-        copy(unsafe.Slice((*byte) (&(reply.body[byteSize])), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&afterTimestamp)), longSize))
-        copy(unsafe.Slice((*byte) (&(reply.body[byteSize + longSize])), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&fromUser)), longSize))
+		reply.body[0] = fromMode
+		copy(unsafe.Slice((*byte)(&(reply.body[byteSize])), longSize), unsafe.Slice((*byte)(unsafe.Pointer(&afterTimestamp)), longSize))
+		copy(unsafe.Slice((*byte)(&(reply.body[byteSize+longSize])), longSize), unsafe.Slice((*byte)(unsafe.Pointer(&fromUser)), longSize))
 
-        sendMessage(connectionId, reply)
-        return flagProceed
-    }
+		sendMessage(connectionId, reply)
+		return flagProceed
+	}
 
-    for index, xMessage := range messages {
-        newMsg := &message{
-            flagFetchMessages,
-            xMessage.Timestamp,
-            uint32(len(xMessage.Body)),
-            uint32(index),
-            uint32(count),
-            xMessage.From,
-            msg.from,
-            sync.tokenServer,
-            [messageBodySize]byte{},
-        }
+	for index, xMessage := range messages {
+		newMsg := &message{
+			flagFetchMessages,
+			xMessage.Timestamp,
+			uint32(len(xMessage.Body)),
+			uint32(index),
+			uint32(count),
+			xMessage.From,
+			msg.from,
+			sync.tokenServer,
+			[messageBodySize]byte{},
+		}
 
-        copy(
-            unsafe.Slice((*byte) (unsafe.Pointer(&(newMsg.body[0]))), messageBodySize),
-            unsafe.Slice((*byte) (unsafe.Pointer(&(xMessage.Body[0]))), len(xMessage.Body)),
-        )
+		copy(
+			unsafe.Slice((*byte)(unsafe.Pointer(&(newMsg.body[0]))), messageBodySize),
+			unsafe.Slice((*byte)(unsafe.Pointer(&(xMessage.Body[0]))), len(xMessage.Body)),
+		)
 
-        sendMessage(connectionId, newMsg)
+		sendMessage(connectionId, newMsg)
 
-        if timestamp := xMessage.Timestamp; lastMessageTimestamp < timestamp {
-            lastMessageTimestamp = timestamp
-        }
-    }
+		if timestamp := xMessage.Timestamp; lastMessageTimestamp < timestamp {
+			lastMessageTimestamp = timestamp
+		}
+	}
 
-    //sync.rwMutex.Lock() // deprecated
-    //database.DeleteMessagesFromOrForUser(fromMode == 1, fromUser, lastMessageTimestamp)
-    //sync.rwMutex.Unlock()
+	//sync.rwMutex.Lock() // deprecated
+	//database.DeleteMessagesFromOrForUser(fromMode == 1, fromUser, lastMessageTimestamp)
+	//sync.rwMutex.Unlock()
 
-    return flagProceed
+	return flagProceed
 }
 
 func routeMessage(connectionId uint32, msg *message) int32 {
-    utils.Assert(msg != nil)
-    flag := msg.flag
-    xConnectionId, userIdFromToken := crypto.OpenToken(msg.token)
+	utils.Assert(msg != nil)
+	flag := msg.flag
+	xConnectionId, userIdFromToken := crypto.OpenToken(msg.token)
 
-    sync.rwMutex.Lock()
+	sync.rwMutex.Lock()
 
-    state := getConnectionState(connectionId)
-    utils.Assert(state != nil)
-    userId := getConnectedUserId(connectionId)
+	state := getConnectionState(connectionId)
+	utils.Assert(state != nil)
+	userId := getConnectedUserId(connectionId)
 
-    if flag == flagLogIn || flag == flagRegister {
-        utils.Assert(
-            *state == 0 && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
-            msg.from == fromAnonymous &&
-            xConnectionId == nil &&
-            userIdFromToken == nil &&
-            msg.to == toServer,
-        )
+	if flag == flagLogIn || flag == flagRegister {
+		utils.Assert(
+			*state == stateConnected && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
+				msg.from == fromAnonymous &&
+				xConnectionId == nil &&
+				userIdFromToken == nil &&
+				msg.to == toServer,
+		)
 
-        setConnectionState(connectionId, stateSecureConnectionEstablished)
-    } else {
-        utils.Assert(
-            *state > 0 &&
-            userId != nil &&
-            msg.from != fromAnonymous &&
-            msg.from != fromServer,
-        )
+		setConnectionState(connectionId, stateSecureConnectionEstablished)
+	} else {
+		utils.Assert(
+			*state > stateConnected &&
+				userId != nil &&
+				msg.from != fromAnonymous &&
+				msg.from != fromServer,
+		)
 
-        if xConnectionId == nil ||
-            userIdFromToken == nil ||
-            *xConnectionId != connectionId ||
-            *userIdFromToken != *userId ||
-            msg.from != *userIdFromToken {
+		if xConnectionId == nil ||
+			userIdFromToken == nil ||
+			*xConnectionId != connectionId ||
+			*userIdFromToken != *userId ||
+			msg.from != *userIdFromToken {
 
-            sync.rwMutex.Unlock()
+			sync.rwMutex.Unlock()
 
-            sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
-            finishRequested(connectionId)
-            return flagFinishWithError
-        }
-    }
+			sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
+			finishRequested(connectionId)
+			return flagFinishWithError
+		}
+	}
 
-    shuttingDown := sync.shuttingDown
-    sync.rwMutex.Unlock()
+	shuttingDown := sync.shuttingDown
+	sync.rwMutex.Unlock()
 
-    if shuttingDown {
-        sendMessage(connectionId, simpleServerMessage(flagError, *userId))
-        finishRequested(connectionId)
-        return flagFinishWithError
-    }
+	if shuttingDown {
+		sendMessage(connectionId, simpleServerMessage(flagError, *userId))
+		finishRequested(connectionId)
+		return flagFinishWithError
+	}
 
-    switch flag {
-        case flagShutdown:
-            return shutdownRequested(connectionId, getUser(connectionId), msg)
-        case flagExchangeKeys: fallthrough
-        case flagExchangeKeysDone: fallthrough
-        case flagExchangeHeaders: fallthrough
-        case flagExchangeHeadersDone: fallthrough
-        case flagFileAsk: fallthrough
-        case flagFile: fallthrough
-        case flagProceed:
-            return proceedRequested(msg)
-        case flagLogIn:
-            utils.Assert(msg.to == toServer)
-            return loggingInWithCredentialsRequested(connectionId, msg)
-        case flagRegister:
-            utils.Assert(msg.to == toServer)
-            return registrationWithCredentialsRequested(connectionId, msg)
-        case flagFinish:
-            utils.Assert(msg.to == toServer)
-            utils.Assert(msg.to == toServer)
-            return finishRequested(connectionId)
-        case flagFetchUsers:
-            utils.Assert(msg.to == toServer)
-            return usersListRequested(connectionId, *userIdFromToken)
-        case flagFetchMessages:
-            utils.Assert(msg.to == toServer)
-            return messagesRequested(connectionId, msg)
-        default:
-            utils.JustThrow()
-    }
-    return 0 // not gonna get here
+	switch flag {
+	case flagShutdown:
+		return shutdownRequested(connectionId, getUser(connectionId), msg)
+	case flagExchangeKeys:
+		fallthrough
+	case flagExchangeKeysDone:
+		fallthrough
+	case flagExchangeHeaders:
+		fallthrough
+	case flagExchangeHeadersDone:
+		fallthrough
+	case flagFileAsk:
+		fallthrough
+	case flagFile:
+		fallthrough
+	case flagProceed:
+		return proceedRequested(msg)
+	case flagLogIn:
+		utils.Assert(msg.to == toServer)
+		return loggingInWithCredentialsRequested(connectionId, msg)
+	case flagRegister:
+		utils.Assert(msg.to == toServer)
+		return registrationWithCredentialsRequested(connectionId, msg)
+	case flagFinish:
+		utils.Assert(msg.to == toServer)
+		utils.Assert(msg.to == toServer)
+		return finishRequested(connectionId)
+	case flagFetchUsers:
+		utils.Assert(msg.to == toServer)
+		return usersListRequested(connectionId, *userIdFromToken)
+	case flagFetchMessages:
+		utils.Assert(msg.to == toServer)
+		return messagesRequested(connectionId, msg)
+	default:
+		utils.JustThrow()
+	}
+	return 0 // not gonna get here
 }
