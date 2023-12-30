@@ -19,163 +19,141 @@
 package options
 
 import (
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
+    "os"
+    "path/filepath"
+    "strconv"
+    "strings"
 )
 
 const (
-	fileName                                = "options.txt"
-	host                                    = "host"
-	port                                    = "port"
-	maxUsersCount                           = "maxUsersCount"
-	serverPrivateSignKey                    = "serverPrivateSignKey"
-	mongodbUrl                              = "mongodbUrl"
-	adminPassword                           = "adminPassword"
-	maxTimeMillisToPreserveActiveConnection = "maxTimeMillisToPreserveActiveConnection"
-	maxTimeMillisIntervalBetweenMessages    = "maxTimeMillisIntervalBetweenMessages"
-	linesCount                              = 8
+    fileName = "options.txt"
+    host = "host"
+    port = "port"
+    maxUsersCount = "maxUsersCount"
+    serverPrivateSignKey = "serverPrivateSignKey"
+    mongodbUrl = "mongodbUrl"
+    adminPassword = "adminPassword"
+    maxTimeMillisToPreserveActiveConnection = "maxTimeMillisToPreserveActiveConnection"
+    maxTimeMillisIntervalBetweenMessages = "maxTimeMillisIntervalBetweenMessages"
+    linesCount = 8
 )
 
 type Options struct {
-	Host                                    string
-	Port                                    uint
-	MaxUsersCount                           uint
-	ServerPrivateSignKey                    []byte
-	MongodbUrl                              string
-	AdminPassword                           []byte // TODO: fill with random bytes after use
-	MaxTimeMillisToPreserveActiveConnection uint
-	MaxTimeMillisIntervalBetweenMessages    uint
+    Host string
+    Port uint
+    MaxUsersCount uint
+    ServerPrivateSignKey []byte
+    MongodbUrl string
+    AdminPassword []byte // TODO: fill with random bytes after use
+    MaxTimeMillisToPreserveActiveConnection uint
+    MaxTimeMillisIntervalBetweenMessages uint
 }
 
 func Init(secretKeySize uint, maxPasswordSize uint) *Options { // nillable // TODO: replace nillable values with self-made optionals
-	exe, _ := os.Executable()
+    exe, _ := os.Executable()
 
-	bytes, err := os.ReadFile(filepath.Dir(exe) + "/" + fileName)
-	if len(bytes) == 0 || err != nil {
-		return nil
-	}
+    bytes, err := os.ReadFile(filepath.Dir(exe) + "/" + fileName)
+    if len(bytes) == 0 || err != nil { return nil }
 
-	lines := strings.Split(string(bytes), "\n")
-	if len(lines) != linesCount {
-		return nil
-	}
+    lines := strings.Split(string(bytes), "\n")
+    if len(lines) != linesCount { return nil }
 
-	options := &Options{
-		Host:                 "",
-		Port:                 0,
-		MaxUsersCount:        0,
-		ServerPrivateSignKey: nil,
-		MongodbUrl:           "",
-		AdminPassword:        nil,
-	}
+    options := &Options{
+        Host: "",
+        Port: 0,
+        MaxUsersCount: 0,
+        ServerPrivateSignKey: nil,
+        MongodbUrl: "",
+        AdminPassword: nil,
+    }
 
-	for _, line := range lines {
-		parts := strings.Split(line, "=")
-		value := parts[1]
+    for _, line := range lines {
+        parts := strings.Split(line, "=")
+        value := parts[1]
 
-		switch parts[0] {
-		case host:
-			options.Host = parseHost(value)
-			if len(options.Host) == 0 {
-				return nil
-			}
-		case port:
-			options.Port = parsePort(value)
-			if options.Port == 0 {
-				return nil
-			}
-		case maxUsersCount:
-			options.MaxUsersCount = parseMaxUsersCount(value)
-			if options.MaxUsersCount == 0 {
-				return nil
-			}
-		case serverPrivateSignKey:
-			options.ServerPrivateSignKey = parseServerPrivateSignKey(value, secretKeySize)
-			if len(options.ServerPrivateSignKey) == 0 {
-				return nil
-			}
-		case mongodbUrl:
-			options.MongodbUrl = parseMongodbUrl(value)
-			if len(options.MongodbUrl) == 0 {
-				return nil
-			}
-		case adminPassword:
-			options.AdminPassword = parseAdminPassword(value, maxPasswordSize)
-			if len(options.AdminPassword) == 0 {
-				return nil
-			}
-		case maxTimeMillisToPreserveActiveConnection:
-			options.MaxTimeMillisToPreserveActiveConnection = parseMaxTimeMillisToPreserveActiveConnection(value)
-			if options.MaxTimeMillisToPreserveActiveConnection == 0 {
-				return nil
-			} // TODO: verify correctness of these options
-		case maxTimeMillisIntervalBetweenMessages:
-			options.MaxTimeMillisIntervalBetweenMessages = parseMaxTimeMillisIntervalBetweenMessages(value)
-			if options.MaxTimeMillisIntervalBetweenMessages == 0 {
-				return nil
-			}
-		}
-	}
+        switch parts[0] {
+            case host:
+                options.Host = parseHost(value)
+                if len(options.Host) == 0 { return nil }
+            case port:
+                options.Port = parsePort(value)
+                if options.Port == 0 { return nil }
+            case maxUsersCount:
+                options.MaxUsersCount = parseMaxUsersCount(value)
+                if options.MaxUsersCount == 0 { return nil }
+            case serverPrivateSignKey:
+                options.ServerPrivateSignKey = parseServerPrivateSignKey(value, secretKeySize)
+                if len(options.ServerPrivateSignKey) == 0 { return nil }
+            case mongodbUrl:
+                options.MongodbUrl = parseMongodbUrl(value)
+                if len(options.MongodbUrl) == 0 { return nil }
+            case adminPassword:
+                options.AdminPassword = parseAdminPassword(value, maxPasswordSize)
+                if len(options.AdminPassword) == 0 { return nil }
+            case maxTimeMillisToPreserveActiveConnection:
+                options.MaxTimeMillisToPreserveActiveConnection = parseMaxTimeMillisToPreserveActiveConnection(value)
+                if options.MaxTimeMillisToPreserveActiveConnection == 0 { return nil }
+            case maxTimeMillisIntervalBetweenMessages:
+                options.MaxTimeMillisIntervalBetweenMessages = parseMaxTimeMillisIntervalBetweenMessages(value)
+                if options.MaxTimeMillisIntervalBetweenMessages == 0 { return nil }
+        }
+    }
 
-	return options
+    return options
 }
 
 func parseHost(value string) string { return value }
 
 func parseUint(str string) uint {
-	xInt, err := strconv.Atoi(str)
-	if err != nil || xInt < 0 {
-		return 0
-	}
-	return uint(xInt)
+    xInt, err := strconv.Atoi(str)
+    if err != nil || xInt < 0 { return 0 }
+    return uint(xInt)
 }
 
 func parsePort(value string) uint { return parseUint(value) }
 
 func parseMaxUsersCount(value string) uint {
-	count := parseUint(value)
+    count := parseUint(value)
 
-	if count > 1<<14 { // TODO: extract constant (max possible users count)
-		return 0
-	} else {
-		return count
-	}
+    if count > 1 << 14 { // TODO: extract constant (max possible users count)
+        return 0
+    } else {
+        return count
+    }
 }
 
 func parseServerPrivateSignKey(value string, secretKeySize uint) []byte { // nillable
-	bytes := make([]byte, secretKeySize)
+    bytes := make([]byte, secretKeySize)
 
-	count := 0
-	for index, number := range strings.Split(value, ",") {
-		bytes[index] = byte(parseUint(number))
-		count++
-	}
+    count := 0
+    for index, number := range strings.Split(value, ",") {
+        bytes[index] = byte(parseUint(number))
+        count++
+    }
 
-	if uint(count) != secretKeySize {
-		return nil
-	} else {
-		return bytes
-	}
+    if uint(count) != secretKeySize {
+        return nil
+    } else {
+        return bytes
+    }
 }
 
 func parseMongodbUrl(value string) string { return value }
 
 func parseAdminPassword(value string, maxPasswordSize uint) []byte { // nillable
-	bytes := make([]byte, maxPasswordSize)
+    bytes := make([]byte, maxPasswordSize)
 
-	var count uint = 0
-	for index, char := range value {
-		bytes[index] = byte(char)
-		count++
-	}
+    var count uint = 0
+    for index, char := range value {
+        bytes[index] = byte(char)
+        count++
+    }
 
-	if count > maxPasswordSize || count == 0 {
-		return nil
-	} else {
-		return bytes
-	}
+    if count > maxPasswordSize || count == 0 {
+        return nil
+    } else {
+        return bytes
+    }
 }
 
 func parseMaxTimeMillisToPreserveActiveConnection(value string) uint { return parseUint(value) }
