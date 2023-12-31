@@ -394,10 +394,6 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
         }
     }
 
-    //sync.rwMutex.Lock() // deprecated
-    //database.DeleteMessagesFromOrForUser(fromMode == 1, fromUser, lastMessageTimestamp)
-    //sync.rwMutex.Unlock()
-
     return flagProceed
 }
 
@@ -412,23 +408,34 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     utils.Assert(state != nil)
     userId := getConnectedUserId(connectionId)
 
+    interruptConnection := func(flag int32, to uint32) {
+        sendMessage(connectionId, simpleServerMessage(flag, to))
+        finishRequested(connectionId)
+    }
+
     if flag == flagLogIn || flag == flagRegister {
-        utils.Assert(
-            *state == stateConnected && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
+        if !(*state == stateConnected && // state associated with this connectionId exist yet (non-existent map entry defaults to typed zero value)
             msg.from == fromAnonymous &&
             xConnectionId == nil &&
             userIdFromToken == nil &&
-            msg.to == toServer,
-        )
+            msg.to == toServer) {
+
+            sync.rwMutex.Unlock()
+            interruptConnection(flagError, toAnonymous)
+            return flagFinishWithError
+        }
 
         setConnectionState(connectionId, stateSecureConnectionEstablished)
     } else {
-        utils.Assert(
-            *state > stateConnected &&
+        if !(*state > stateConnected &&
             userId != nil &&
             msg.from != fromAnonymous &&
-            msg.from != fromServer,
-        )
+            msg.from != fromServer) {
+
+            sync.rwMutex.Unlock()
+            interruptConnection(flagError, msg.from)
+            return flagFinishWithError
+        }
 
         if xConnectionId == nil ||
             userIdFromToken == nil ||
@@ -437,9 +444,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
             msg.from != *userIdFromToken {
 
             sync.rwMutex.Unlock()
-
-            sendMessage(connectionId, simpleServerMessage(flagUnauthenticated, toAnonymous))
-            finishRequested(connectionId)
+            interruptConnection(flagUnauthenticated, toAnonymous)
             return flagFinishWithError
         }
     }
@@ -451,6 +456,15 @@ func routeMessage(connectionId uint32, msg *message) int32 {
         sendMessage(connectionId, simpleServerMessage(flagError, *userId))
         finishRequested(connectionId)
         return flagFinishWithError
+    }
+
+    doIfFromServerOrInterrupt := func(action func() int32) int32 {
+        if msg.to == toServer {
+            return action()
+        } else {
+            interruptConnection(flagError, msg.from)
+            return flagFinishWithError
+        }
     }
 
     switch flag {
@@ -465,23 +479,17 @@ func routeMessage(connectionId uint32, msg *message) int32 {
         case flagProceed:
             return proceedRequested(msg)
         case flagLogIn:
-            utils.Assert(msg.to == toServer)
-            return loggingInWithCredentialsRequested(connectionId, msg)
+            return doIfFromServerOrInterrupt(func() int32 { return loggingInWithCredentialsRequested(connectionId, msg) })
         case flagRegister:
-            utils.Assert(msg.to == toServer)
-            return registrationWithCredentialsRequested(connectionId, msg)
+            return doIfFromServerOrInterrupt(func() int32 { return registrationWithCredentialsRequested(connectionId, msg) })
         case flagFinish:
-            utils.Assert(msg.to == toServer)
-            utils.Assert(msg.to == toServer)
-            return finishRequested(connectionId)
+            return doIfFromServerOrInterrupt(func() int32 { return finishRequested(connectionId) })
         case flagFetchUsers:
-            utils.Assert(msg.to == toServer)
-            return usersListRequested(connectionId, *userIdFromToken)
+            return doIfFromServerOrInterrupt(func() int32 { return usersListRequested(connectionId, *userIdFromToken) })
         case flagFetchMessages:
-            utils.Assert(msg.to == toServer)
-            return messagesRequested(connectionId, msg)
+            return doIfFromServerOrInterrupt(func() int32 { return messagesRequested(connectionId, msg) })
         default:
-            utils.JustThrow()
+            interruptConnection(flagError, msg.from)
+            return flagFinishWithError
     }
-    return 0 // not gonna get here
 }
