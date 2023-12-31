@@ -123,7 +123,8 @@ func shutdownRequested(connectionId uint32, user *database.User, msg *message) i
 
     if !database.IsAdmin(user) {
         sendMessage(connectionId, simpleServerMessage(flagAccessDenied, user.Id))
-        return flagProceed
+        finishRequested(connectionId)
+        return flagFinishWithError
     }
 
     finishRequested(connectionId)
