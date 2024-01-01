@@ -347,7 +347,6 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
     sync.rwMutex.RUnlock()
 
     count := len(messages)
-    var lastMessageTimestamp uint64 = 0
 
     if count == 0 {
         reply := &message{
@@ -389,10 +388,6 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
         )
 
         sendMessage(connectionId, newMsg)
-
-        if timestamp := xMessage.Timestamp; lastMessageTimestamp < timestamp {
-            lastMessageTimestamp = timestamp
-        }
     }
 
     return flagProceed
