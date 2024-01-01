@@ -140,15 +140,16 @@ func shutdownRequested(connectionId uint32, user *database.User, msg *message) i
     return flagShutdown
 }
 
-//goland:noinspection GoRedundantConversion (*byte) - just silence that annoying warning already!
 func proceedRequested(msg *message) int32 {
     utils.Assert(msg != nil && msg.to != msg.from)
 
     if toUserConnectionId, toUser := getAuthorizedConnectedUser(msg.to); toUser != nil {
         sendMessage(toUserConnectionId, msg)
-    } // else user offline or doesn't exist
+    }
 
-    sync.rwMutex.Lock()
+    if msg.flag != flagProceed { return flagProceed } // since this function is called not only with actual proceed but with exchange* flags too. Others are ignored by the server cuz it's clients' deal to handle 'em
+
+    sync.rwMutex.Lock() // save messages only with proceed flag
     database.AddMessage(msg.timestamp, msg.from, msg.to, msg.body[:msg.size])
     sync.rwMutex.Unlock()
 
