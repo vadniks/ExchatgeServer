@@ -166,6 +166,16 @@ func checkConnectionTimeouts(action func(xConnectedUser *connectedUser)) {
     connections.rwMutex.Unlock()
 }
 
+func doForEachConnectedAuthorizedUser(action func (connectionId uint32, user *connectedUser)) {
+    connections.rwMutex.RLock()
+
+    for connectionId, xConnectedUser := range connections.connectedUsers {
+        if xConnectedUser.user != nil { action(connectionId, xConnectedUser) }
+    }
+
+    connections.rwMutex.RUnlock()
+}
+
 func deleteConnection(connectionId uint32) bool { // returns true on success
     connectedUser := getConnectedUser(connectionId)
     if connectedUser == nil { return false }

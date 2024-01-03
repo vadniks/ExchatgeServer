@@ -28,6 +28,7 @@ import (
 )
 
 const flagProceed int32 = 0x00000000
+const flagBroadcast int32 = 0x10000000
 const flagFinish int32 = 0x00000001
 const flagFinishWithError int32 = 0x00000002
 const flagFinishToReconnect int32 = 0x00000003 // after registration connection closes and client should reconnect & login
@@ -118,14 +119,15 @@ func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
     return result
 }
 
+func kickUserCuzOfDenialOfAccess(connectionId uint32, userId uint32) int32 {
+    sendMessage(connectionId, simpleServerMessage(flagAccessDenied, userId))
+    finishRequested(connectionId)
+    return flagFinishWithError
+}
+
 func shutdownRequested(connectionId uint32, user *database.User, msg *message) int32 { // TODO: add more administrative actions, such as: logging in and registration blocking, user ban...
     utils.Assert(user != nil && msg.to == toServer)
-
-    if !database.IsAdmin(user) {
-        sendMessage(connectionId, simpleServerMessage(flagAccessDenied, user.Id))
-        finishRequested(connectionId)
-        return flagFinishWithError
-    }
+    if !database.IsAdmin(user) { return kickUserCuzOfDenialOfAccess(connectionId, user.Id) }
 
     finishRequested(connectionId)
 
@@ -138,6 +140,29 @@ func shutdownRequested(connectionId uint32, user *database.User, msg *message) i
     sync.rwMutex.Unlock()
 
     return flagShutdown
+}
+
+func broadcastRequested(connectionId uint32, user *database.User, msg *message) int32 {
+    utils.Assert(user != nil && msg.to == toServer)
+    if !database.IsAdmin(user) { return kickUserCuzOfDenialOfAccess(connectionId, user.Id) }
+
+    doForEachConnectedAuthorizedUser(func(connectionId uint32, user *connectedUser) {
+        xMsg := &message{
+            flag: flagBroadcast,
+            timestamp: utils.CurrentTimeMillis(),
+            size: msg.size,
+            index: 0,
+            count: 1,
+            from: fromServer,
+            to: user.user.Id,
+            token: sync.tokenServer,
+            body: [messageBodySize]byte{},
+        }
+        copy(unsafe.Slice(&(xMsg.body[0]), msg.size), unsafe.Slice(&(msg.body[0]), msg.size))
+        sendMessage(connectionId, xMsg)
+    })
+
+    return flagProceed
 }
 
 func proceedRequested(msg *message) int32 {
@@ -455,7 +480,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
         return flagFinishWithError
     }
 
-    doIfFromServerOrInterrupt := func(action func() int32) int32 {
+    doIfToServerOrInterrupt := func(action func() int32) int32 {
         if msg.to == toServer {
             return action()
         } else {
@@ -476,15 +501,17 @@ func routeMessage(connectionId uint32, msg *message) int32 {
         case flagProceed:
             return proceedRequested(msg)
         case flagLogIn:
-            return doIfFromServerOrInterrupt(func() int32 { return loggingInWithCredentialsRequested(connectionId, msg) })
+            return doIfToServerOrInterrupt(func() int32 { return loggingInWithCredentialsRequested(connectionId, msg) })
         case flagRegister:
-            return doIfFromServerOrInterrupt(func() int32 { return registrationWithCredentialsRequested(connectionId, msg) })
+            return doIfToServerOrInterrupt(func() int32 { return registrationWithCredentialsRequested(connectionId, msg) })
         case flagFinish:
-            return doIfFromServerOrInterrupt(func() int32 { return finishRequested(connectionId) })
+            return doIfToServerOrInterrupt(func() int32 { return finishRequested(connectionId) })
         case flagFetchUsers:
-            return doIfFromServerOrInterrupt(func() int32 { return usersListRequested(connectionId, *userIdFromToken) })
+            return doIfToServerOrInterrupt(func() int32 { return usersListRequested(connectionId, *userIdFromToken) })
         case flagFetchMessages:
-            return doIfFromServerOrInterrupt(func() int32 { return messagesRequested(connectionId, msg) })
+            return doIfToServerOrInterrupt(func() int32 { return messagesRequested(connectionId, msg) })
+        case flagBroadcast:
+            return broadcastRequested(connectionId, getUser(connectionId), msg)
         default:
             interruptConnection(flagError, msg.from)
             return flagFinishWithError

@@ -300,7 +300,7 @@ func processClientMessage(connectionId uint32, messageBytes []byte) int32 {
 
 func sendMessage(connectionId uint32, msg *message) {
     xCrypto := getCrypto(connectionId)
-    utils.Assert(msg != nil && xCrypto != nil)
+    utils.Assert(msg != nil && xCrypto != nil) // TODO: instead of asserting just return
 
     connection := getConnection(connectionId)
     utils.Assert(connection != nil)
