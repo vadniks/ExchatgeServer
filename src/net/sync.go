@@ -146,7 +146,9 @@ func broadcastRequested(connectionId uint32, user *database.User, msg *message) 
     utils.Assert(user != nil && msg.to == toServer)
     if !database.IsAdmin(user) { return kickUserCuzOfDenialOfAccess(connectionId, user.Id) }
 
-    doForEachConnectedAuthorizedUser(func(connectionId uint32, user *connectedUser) {
+    doForEachConnectedAuthorizedUser(func(connectionId uint32, xUser *connectedUser) {
+        if xUser.user.Id == user.Id { return }
+
         xMsg := &message{
             flag: flagBroadcast,
             timestamp: utils.CurrentTimeMillis(),
@@ -154,7 +156,7 @@ func broadcastRequested(connectionId uint32, user *database.User, msg *message) 
             index: 0,
             count: 1,
             from: fromServer,
-            to: user.user.Id,
+            to: xUser.user.Id,
             token: sync.tokenServer,
             body: [messageBodySize]byte{},
         }
