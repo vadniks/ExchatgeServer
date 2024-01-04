@@ -68,7 +68,7 @@ type syncT struct {
     maxUsersCount uint32
     tokenAnonymous []byte
     tokenServer [crypto.TokenSize]byte
-    bodyStub [messageBodySize]byte
+    bodyStub [maxMessageBodySize]byte
     rwMutex goSync.RWMutex
     shuttingDown bool
 }
@@ -79,8 +79,8 @@ func syncInitialize(maxUsersCount uint) {
     sync = &syncT{
         uint32(maxUsersCount),
         make([]byte, crypto.TokenSize), // all zeroes
-        crypto.MakeServerToken(messageBodySize),
-        [messageBodySize]byte{}, // all zeroes,
+        crypto.MakeServerToken(maxMessageBodySize),
+        [maxMessageBodySize]byte{}, // all zeroes,
         goSync.RWMutex{},
         false,
     }
@@ -102,7 +102,7 @@ func simpleServerMessage(xFlag int32, xTo uint32) *message {
 
 func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
     bodySize := len(xBody)
-    utils.Assert(bodySize > 0 && bodySize <= int(messageBodySize))
+    utils.Assert(bodySize > 0 && bodySize <= int(maxMessageBodySize))
 
     result := &message{
         flag: xFlag,
@@ -115,7 +115,7 @@ func serverMessage(xFlag int32, xTo uint32, xBody []byte) *message {
         token: sync.tokenServer,
     }
 
-    copy(unsafe.Slice(&(result.body[0]), messageBodySize), xBody)
+    copy(unsafe.Slice(&(result.body[0]), maxMessageBodySize), xBody)
     return result
 }
 
@@ -158,7 +158,7 @@ func broadcastRequested(connectionId uint32, user *database.User, msg *message) 
             from: fromServer,
             to: xUser.user.Id,
             token: sync.tokenServer,
-            body: [messageBodySize]byte{},
+            body: [maxMessageBodySize]byte{},
         }
         copy(unsafe.Slice(&(xMsg.body[0]), msg.size), unsafe.Slice(&(msg.body[0]), msg.size))
         sendMessage(connectionId, xMsg)
@@ -282,9 +282,9 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
     registeredUsers := database.GetAllUsers()
     var userInfosBytes []byte
 
-    infosPerMessage := uint32(messageBodySize / userInfoSize)
-    utils.Assert(infosPerMessage <= uint32(messageBodySize))
-    stubBytes := make([]byte, uint32(messageBodySize) - infosPerMessage * uint32(userInfoSize))
+    infosPerMessage := uint32(maxMessageBodySize / userInfoSize)
+    utils.Assert(infosPerMessage <= uint32(maxMessageBodySize))
+    stubBytes := make([]byte, uint32(maxMessageBodySize) - infosPerMessage * uint32(userInfoSize))
 
     var infosCount uint32 = 0
     for _, user := range registeredUsers {
@@ -306,7 +306,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
     }
 
     messagesCount := uint32(math.Ceil(float64(infosCount) / float64(infosPerMessage)))
-    totalPayloadBytesSize := messagesCount * uint32(messageBodySize)
+    totalPayloadBytesSize := messagesCount * uint32(maxMessageBodySize)
     userInfosBytes = append(userInfosBytes, make([]byte, totalPayloadBytesSize - uint32(len(userInfosBytes)))...)
     utils.Assert(uint32(len(userInfosBytes)) == totalPayloadBytesSize)
 
@@ -328,12 +328,12 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
             from: fromServer,
             to: userId,
             token: sync.tokenServer,
-            body: [messageBodySize]byte{},
+            body: [maxMessageBodySize]byte{},
         }
 
         copy(
-           unsafe.Slice((*byte) (unsafe.Pointer(&(msg.body))), messageBodySize),
-           unsafe.Slice((*byte) (unsafe.Pointer(&(userInfosBytes[messageIndex * uint32(messageBodySize)]))), messageBodySize),
+           unsafe.Slice((*byte) (unsafe.Pointer(&(msg.body))), maxMessageBodySize),
+           unsafe.Slice((*byte) (unsafe.Pointer(&(userInfosBytes[messageIndex * uint32(maxMessageBodySize)]))), maxMessageBodySize),
         )
 
         sendMessage(connectionId, msg)
@@ -380,18 +380,18 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
         reply := &message{
             flagFetchMessages,
             utils.CurrentTimeMillis(),
-            0,
+            uint32(1 + longSize + intSize),
             0,
             1,
             fromServer,
             msg.from,
             sync.tokenServer,
-            [messageBodySize]byte{},
+            [maxMessageBodySize]byte{},
         }
 
         reply.body[0] = fromMode
         copy(unsafe.Slice((*byte) (&(reply.body[byteSize])), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&afterTimestamp)), longSize))
-        copy(unsafe.Slice((*byte) (&(reply.body[byteSize + longSize])), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&fromUser)), longSize))
+        copy(unsafe.Slice((*byte) (&(reply.body[byteSize + longSize])), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&fromUser)), intSize))
 
         sendMessage(connectionId, reply)
         return flagProceed
@@ -407,11 +407,11 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
             xMessage.From,
             msg.from,
             sync.tokenServer,
-            [messageBodySize]byte{},
+            [maxMessageBodySize]byte{},
         }
 
         copy(
-            unsafe.Slice((*byte) (unsafe.Pointer(&(newMsg.body[0]))), messageBodySize),
+            unsafe.Slice((*byte) (unsafe.Pointer(&(newMsg.body[0]))), maxMessageBodySize),
             unsafe.Slice((*byte) (unsafe.Pointer(&(xMessage.Body[0]))), len(xMessage.Body)),
         )
 

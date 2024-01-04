@@ -33,9 +33,9 @@ import (
 const intSize = 4
 const longSize = 8
 
-const messageSize uint = 1 << 10 // exactly 1 kB
+const maxMessageSize uint = 1 << 8 // 256
 const messageHeadSize = intSize * 6 + longSize + crypto.TokenSize // 96
-const messageBodySize = messageSize - messageHeadSize // 928
+const maxMessageBodySize = maxMessageSize - messageHeadSize // 160
 const userInfoSize = intSize + 1/*sizeof(bool)*/ + usernameSize // 21
 
 type netT struct {
@@ -57,7 +57,7 @@ type message struct {
     from uint32
     to uint32
     token [crypto.TokenSize]byte
-    body [messageBodySize]byte // TODO: generate permanent encryption key for each conversation and store encrypted messages in a database
+    body []byte
 }
 
 type userInfo struct {
@@ -69,7 +69,7 @@ type userInfo struct {
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
 func (msg *message) pack() []byte {
     utils.Assert(msg != nil)
-    bytes := make([]byte, messageSize)
+    bytes := make([]byte, maxMessageSize)
 
     copy(unsafe.Slice(&(bytes[0]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.flag))), intSize))
     copy(unsafe.Slice(&(bytes[intSize]), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.timestamp))), longSize))
@@ -80,7 +80,7 @@ func (msg *message) pack() []byte {
     copy(unsafe.Slice(&(bytes[intSize * 5 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.to))), intSize))
     copy(unsafe.Slice(&(bytes[intSize * 6 + longSize]), crypto.TokenSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.token))), crypto.TokenSize))
 
-    copy(unsafe.Slice(&(bytes[messageHeadSize]), messageBodySize), unsafe.Slice(&(msg.body[0]), messageBodySize))
+    copy(unsafe.Slice(&(bytes[messageHeadSize]), maxMessageBodySize), unsafe.Slice(&(msg.body[0]), maxMessageBodySize))
     return bytes
 }
 
@@ -98,7 +98,7 @@ func unpackMessage(bytes []byte) *message {
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.to))), intSize), unsafe.Slice(&(bytes[intSize * 5 + longSize]), intSize))
     copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.token))), crypto.TokenSize), unsafe.Slice(&(bytes[intSize * 6 + longSize]), crypto.TokenSize))
 
-    copy(unsafe.Slice(&(message.body[0]), messageBodySize), unsafe.Slice(&(bytes[messageHeadSize]), messageBodySize))
+    copy(unsafe.Slice(&(message.body[0]), maxMessageBodySize), unsafe.Slice(&(bytes[messageHeadSize]), maxMessageBodySize))
     return message
 }
 
@@ -125,7 +125,7 @@ func Initialize(maxUsersCount uint, maxTimeMillisToPreserveActiveConnection uint
         uint64(maxTimeMillisIntervalBetweenMessages),
         serverPublicKey,
         serverSecretKey,
-        crypto.EncryptedSize(messageSize),
+        crypto.EncryptedSize(maxMessageSize),
         idsPool.InitIdsPool(uint32(maxUsersCount)),
     }
 
