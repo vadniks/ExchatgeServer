@@ -38,12 +38,13 @@ const messageHeadSize = intSize * 6 + longSize + crypto.TokenSize // 96
 const maxMessageBodySize = maxMessageSize - messageHeadSize // 160
 const userInfoSize = intSize + 1/*sizeof(bool)*/ + usernameSize // 21
 
+const timeout = 5000 // milliseconds
+
 type netT struct {
     maxTimeMillisToPreserveActiveConnection uint64
     maxTimeMillisIntervalBetweenMessages uint64
     serverPublicKey []byte
     serverSecretKey []byte
-    messageBufferSize uint
     connectionIdsPool *idsPool.IdsPool
 }
 var net *netT = nil
@@ -138,7 +139,6 @@ func Initialize(maxUsersCount uint, maxTimeMillisToPreserveActiveConnection uint
         uint64(maxTimeMillisIntervalBetweenMessages),
         serverPublicKey,
         serverSecretKey,
-        crypto.EncryptedSize(maxMessageSize),
         idsPool.InitIdsPool(uint32(maxUsersCount)),
     }
 
@@ -253,12 +253,10 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
     }
 
     addNewConnection(connectionId, connection, xCrypto)
-
-    messageBuffer := make([]byte, net.messageBufferSize)
     for {
         disconnected := false
 
-        if receive(connection, messageBuffer, &disconnected) {
+        if messageBuffer := receiveMessage(connection, &disconnected); messageBuffer != nil {
             switch processClientMessage(connectionId, messageBuffer) {
                 case flagFinishToReconnect: fallthrough
                 case flagFinishWithError: fallthrough
@@ -284,7 +282,7 @@ func send(connection *goNet.Conn, payload []byte) {
     utils.Assert(connection != nil && len(payload) > 0)
 
     count, err := (*connection).Write(payload)
-    utils.Assert(count == len(payload) && err == nil)
+    utils.Assert(count == len(payload) && err == nil) // TODO: remove assert - just ignore // if !-first- || !-second- { return }
 
     updateConnectionIdleTimeout(connection)
 }
@@ -301,6 +299,27 @@ func receive(connection *goNet.Conn, buffer []byte, /*nillable*/ error *bool) bo
     return count == len(buffer)
 }
 
+func setConnectionTimeoutBetweenMessageParts(connection *goNet.Conn) {
+    err := (*connection).SetDeadline(time.UnixMilli(int64(utils.CurrentTimeMillis()) + int64(timeout))) // wait for $timeout, which is less than used in updateIdleTimeout, as right after the size the actual message must come, timeout then will be reset to default by receive()
+    utils.Assert(err == nil)
+}
+
+//goland:noinspection GoRedundantConversion
+func receiveMessage(connection *goNet.Conn, error *bool) []byte { // nillable result
+    utils.Assert(error != nil)
+
+    var size uint32 = 0
+    if !receive(connection, unsafe.Slice((*byte) (unsafe.Pointer(&size)), intSize), error) { return nil }
+    utils.Assert(!*error && size > 0 && size <= uint32(maxMessageSize))
+
+    setConnectionTimeoutBetweenMessageParts(connection)
+
+    buffer := make([]byte, size)
+    if !receive(connection, buffer, error) { return nil }
+
+    return buffer
+}
+
 func processClientMessage(connectionId uint32, messageBytes []byte) int32 {
     xCrypto := getCrypto(connectionId)
     utils.Assert(xCrypto != nil && len(messageBytes) > 0)
@@ -311,7 +330,10 @@ func processClientMessage(connectionId uint32, messageBytes []byte) int32 {
     return routeMessage(connectionId, message)
 }
 
+//goland:noinspection GoRedundantConversion
 func sendMessage(connectionId uint32, msg *message) {
+    utils.Assert(int(msg.size) == len(msg.body))
+
     xCrypto := getCrypto(connectionId)
     utils.Assert(msg != nil && xCrypto != nil) // TODO: instead of asserting just return
 
@@ -321,5 +343,7 @@ func sendMessage(connectionId uint32, msg *message) {
     packed := msg.pack()
     encrypted := xCrypto.Encrypt(packed)
 
+    send(connection, unsafe.Slice((*byte) (unsafe.Pointer(&(msg.size))), intSize))
+    setConnectionTimeoutBetweenMessageParts(connection)
     send(connection, encrypted)
 }
