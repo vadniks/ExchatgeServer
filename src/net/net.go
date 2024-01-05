@@ -57,7 +57,7 @@ type message struct {
     from uint32
     to uint32
     token [crypto.TokenSize]byte
-    body []byte
+    body []byte // nillable
 }
 
 type userInfo struct {
@@ -66,10 +66,16 @@ type userInfo struct {
     name [usernameSize]byte
 }
 
+func wholeMessageBytesSize(size uint32) uint32 { return uint32(messageHeadSize) + size }
+
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
 func (msg *message) pack() []byte {
     utils.Assert(msg != nil)
-    bytes := make([]byte, maxMessageSize)
+
+    utils.Assert(msg.body == nil && msg.size == 0 ||
+        msg.body != nil && msg.size != 0 && uint32(len(msg.body)) == msg.size && msg.size <= uint32(maxMessageBodySize))
+
+    bytes := make([]byte, wholeMessageBytesSize(msg.size))
 
     copy(unsafe.Slice(&(bytes[0]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.flag))), intSize))
     copy(unsafe.Slice(&(bytes[intSize]), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.timestamp))), longSize))
@@ -80,26 +86,33 @@ func (msg *message) pack() []byte {
     copy(unsafe.Slice(&(bytes[intSize * 5 + longSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.to))), intSize))
     copy(unsafe.Slice(&(bytes[intSize * 6 + longSize]), crypto.TokenSize), unsafe.Slice((*byte) (unsafe.Pointer(&(msg.token))), crypto.TokenSize))
 
-    copy(unsafe.Slice(&(bytes[messageHeadSize]), maxMessageBodySize), unsafe.Slice(&(msg.body[0]), maxMessageBodySize))
+    if msg.body != nil { copy(unsafe.Slice(&(bytes[messageHeadSize]), msg.size), unsafe.Slice(&(msg.body[0]), msg.size)) }
     return bytes
 }
 
 //goland:noinspection GoRedundantConversion (*byte) - won't compile without casting
 func unpackMessage(bytes []byte) *message {
     utils.Assert(len(bytes) > 0)
-    message := new(message) // TODO: make generic lambda to copy bytes
+    msg := new(message)
 
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.flag))), intSize), unsafe.Slice(&(bytes[0]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.timestamp))), longSize), unsafe.Slice(&(bytes[intSize]), longSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.size))), intSize), unsafe.Slice(&(bytes[intSize + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.index))), intSize), unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.count))), intSize), unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.from))), intSize), unsafe.Slice(&(bytes[intSize * 4 + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.to))), intSize), unsafe.Slice(&(bytes[intSize * 5 + longSize]), intSize))
-    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(message.token))), crypto.TokenSize), unsafe.Slice(&(bytes[intSize * 6 + longSize]), crypto.TokenSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(msg.flag))), intSize), unsafe.Slice(&(bytes[0]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(msg.timestamp))), longSize), unsafe.Slice(&(bytes[intSize]), longSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(msg.size))), intSize), unsafe.Slice(&(bytes[intSize + longSize]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(msg.index))), intSize), unsafe.Slice(&(bytes[intSize * 2 + longSize]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(msg.count))), intSize), unsafe.Slice(&(bytes[intSize * 3 + longSize]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(msg.from))), intSize), unsafe.Slice(&(bytes[intSize * 4 + longSize]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(msg.to))), intSize), unsafe.Slice(&(bytes[intSize * 5 + longSize]), intSize))
+    copy(unsafe.Slice((*byte) (unsafe.Pointer(&(msg.token))), crypto.TokenSize), unsafe.Slice(&(bytes[intSize * 6 + longSize]), crypto.TokenSize))
 
-    copy(unsafe.Slice(&(message.body[0]), maxMessageBodySize), unsafe.Slice(&(bytes[messageHeadSize]), maxMessageBodySize))
-    return message
+    utils.Assert(msg.size <= uint32(maxMessageBodySize))
+    if msg.size > 0 {
+        msg.body = make([]byte, msg.size)
+        copy(unsafe.Slice(&(msg.body[0]), msg.size), unsafe.Slice(&(bytes[messageHeadSize]), msg.size))
+    } else {
+        msg.body = nil
+    }
+
+    return msg
 }
 
 //goland:noinspection GoRedundantConversion
