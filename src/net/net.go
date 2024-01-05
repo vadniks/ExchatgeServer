@@ -256,8 +256,8 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
     for {
         disconnected := false
 
-        if messageBuffer := receiveMessage(connection, &disconnected); messageBuffer != nil {
-            switch processClientMessage(connectionId, messageBuffer) {
+        if messageBuffer := receiveEncryptedMessageBytes(connection, &disconnected); messageBuffer != nil {
+            switch processEncryptedClientMessage(connectionId, messageBuffer) {
                 case flagFinishToReconnect: fallthrough
                 case flagFinishWithError: fallthrough
                 case flagFinish:
@@ -305,12 +305,12 @@ func setConnectionTimeoutBetweenMessageParts(connection *goNet.Conn) {
 }
 
 //goland:noinspection GoRedundantConversion
-func receiveMessage(connection *goNet.Conn, error *bool) []byte { // nillable result
+func receiveEncryptedMessageBytes(connection *goNet.Conn, error *bool) []byte { // nillable result
     utils.Assert(error != nil)
 
     var size uint32 = 0
     if !receive(connection, unsafe.Slice((*byte) (unsafe.Pointer(&size)), intSize), error) { return nil }
-    utils.Assert(!*error && size > 0 && size <= uint32(maxMessageSize))
+    utils.Assert(!*error && size > 0 && size <= uint32(crypto.EncryptedSize(maxMessageSize)))
 
     setConnectionTimeoutBetweenMessageParts(connection)
 
@@ -320,11 +320,12 @@ func receiveMessage(connection *goNet.Conn, error *bool) []byte { // nillable re
     return buffer
 }
 
-func processClientMessage(connectionId uint32, messageBytes []byte) int32 {
+func processEncryptedClientMessage(connectionId uint32, messageBytes []byte) int32 {
     xCrypto := getCrypto(connectionId)
-    utils.Assert(xCrypto != nil && len(messageBytes) > 0)
+    utils.Assert(xCrypto != nil && len(messageBytes) > 0 && uint(len(messageBytes)) <= crypto.EncryptedSize(maxMessageSize))
 
     decrypted := xCrypto.Decrypt(messageBytes)
+    utils.Assert(len(decrypted) > 0 && len(decrypted) <= int(maxMessageSize))
     message := unpackMessage(decrypted)
 
     return routeMessage(connectionId, message)
@@ -332,7 +333,7 @@ func processClientMessage(connectionId uint32, messageBytes []byte) int32 {
 
 //goland:noinspection GoRedundantConversion
 func sendMessage(connectionId uint32, msg *message) {
-    utils.Assert(int(msg.size) == len(msg.body))
+    utils.Assert(int(msg.size) == len(msg.body) && len(msg.body) <= int(maxMessageBodySize))
 
     xCrypto := getCrypto(connectionId)
     utils.Assert(msg != nil && xCrypto != nil) // TODO: instead of asserting just return
