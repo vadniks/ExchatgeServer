@@ -343,6 +343,7 @@ func sendMessage(connectionId uint32, msg *message) {
 
     packed := msg.pack()
     encrypted := xCrypto.Encrypt(packed)
+    utils.Assert(len(encrypted) > 0 && uint(len(encrypted)) <= crypto.EncryptedSize(maxMessageSize))
 
     send(connection, unsafe.Slice((*byte) (unsafe.Pointer(&(msg.size))), intSize))
     setConnectionTimeoutBetweenMessageParts(connection)
