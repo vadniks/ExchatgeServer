@@ -124,7 +124,7 @@ func kickUserCuzOfDenialOfAccess(connectionId uint32, userId uint32) int32 {
 }
 
 func shutdownRequested(connectionId uint32, user *database.User, msg *message) int32 { // TODO: add more administrative actions, such as: logging in and registration blocking, user ban...
-    utils.Assert(user != nil && msg.to == toServer)
+    utils.Assert(user != nil && msg.to == toServer && msg.size == 0)
     if !database.IsAdmin(user) { return kickUserCuzOfDenialOfAccess(connectionId, user.Id) }
 
     finishRequested(connectionId)
@@ -141,7 +141,7 @@ func shutdownRequested(connectionId uint32, user *database.User, msg *message) i
 }
 
 func broadcastRequested(connectionId uint32, user *database.User, msg *message) int32 {
-    utils.Assert(user != nil && msg.to == toServer)
+    utils.Assert(user != nil && msg.to == toServer && msg.size > 0 && msg.body != nil)
     if !database.IsAdmin(user) { return kickUserCuzOfDenialOfAccess(connectionId, user.Id) }
 
     doForEachConnectedAuthorizedUser(func(connectionId uint32, xUser *connectedUser) {
@@ -163,7 +163,7 @@ func broadcastRequested(connectionId uint32, user *database.User, msg *message) 
 }
 
 func proceedRequested(msg *message) int32 {
-    utils.Assert(msg != nil && msg.to != msg.from)
+    utils.Assert(msg != nil && msg.to != msg.from && msg.size > 0 && msg.body != nil)
 
     if toUserConnectionId, toUser := getAuthorizedConnectedUser(msg.to); toUser != nil {
         sendMessage(toUserConnectionId, msg)
@@ -191,7 +191,7 @@ func parseCredentials(msg *message) (username []byte, unhashedPassword []byte) {
 }
 
 func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 { // expects the password not to be hashed in order to compare it with salted hash (which is always different)
-    utils.Assert(msg != nil)
+    utils.Assert(msg != nil && msg.size > 0 && msg.body != nil)
     username, unhashedPassword := parseCredentials(msg)
 
     xUsernameSize := uint(len(username)); passwordSize := uint(len(unhashedPassword))
@@ -223,7 +223,7 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
 }
 
 func registrationWithCredentialsRequested(connectionId uint32, msg *message) int32 {
-    utils.Assert(msg != nil)
+    utils.Assert(msg != nil && msg.size > 0 && msg.body != nil)
 
     sync.rwMutex.Lock()
     if database.GetUsersCount() >= sync.maxUsersCount {
@@ -336,6 +336,8 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
 
 //goland:noinspection GoRedundantConversion
 func messagesRequested(connectionId uint32, msg *message) int32 {
+    utils.Assert(msg.size > 0 && msg.body != nil)
+
     const byteSize = 1
     utils.Assert(unsafe.Sizeof(true) == byteSize)
     const intSize = unsafe.Sizeof(int32(0))
@@ -368,7 +370,12 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
     count := len(messages)
 
     if count == 0 {
-        reply := &message{
+        replyBody := make([]byte, 1)
+        replyBody[0] = fromMode
+        replyBody = append(replyBody, unsafe.Slice((*byte) (unsafe.Pointer(&afterTimestamp)), longSize)...)
+        replyBody = append(replyBody, unsafe.Slice((*byte) (unsafe.Pointer(&fromUser)), intSize)...)
+
+        sendMessage(connectionId, &message{
             flagFetchMessages,
             utils.CurrentTimeMillis(),
             uint32(1 + longSize + intSize),
@@ -377,19 +384,13 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
             fromServer,
             msg.from,
             sync.tokenServer,
-            [maxMessageBodySize]byte{},
-        }
-
-        reply.body[0] = fromMode
-        copy(unsafe.Slice((*byte) (&(reply.body[byteSize])), longSize), unsafe.Slice((*byte) (unsafe.Pointer(&afterTimestamp)), longSize))
-        copy(unsafe.Slice((*byte) (&(reply.body[byteSize + longSize])), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&fromUser)), intSize))
-
-        sendMessage(connectionId, reply)
+            replyBody,
+        })
         return flagProceed
     }
 
     for index, xMessage := range messages {
-        newMsg := &message{
+        sendMessage(connectionId, &message{
             flagFetchMessages,
             xMessage.Timestamp,
             uint32(len(xMessage.Body)),
@@ -398,15 +399,8 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
             xMessage.From,
             msg.from,
             sync.tokenServer,
-            [maxMessageBodySize]byte{},
-        }
-
-        copy(
-            unsafe.Slice((*byte) (unsafe.Pointer(&(newMsg.body[0]))), maxMessageBodySize),
-            unsafe.Slice((*byte) (unsafe.Pointer(&(xMessage.Body[0]))), len(xMessage.Body)),
-        )
-
-        sendMessage(connectionId, newMsg)
+            xMessage.Body,
+        })
     }
 
     return flagProceed
