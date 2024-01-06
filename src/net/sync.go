@@ -304,7 +304,6 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
 
         if infosCount < infosPerMessage && totalRemainingInfos > 0 { continue }
         size := infosCount * uint32(userInfoSize)
-        println(len(userInfosBytes), int(size), infosCount, totalRemainingInfos)
         utils.Assert(len(userInfosBytes) == int(size))
 
         sendMessage(connectionId, &message{

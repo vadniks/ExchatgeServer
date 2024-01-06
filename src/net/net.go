@@ -256,9 +256,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
     for {
         disconnected := false
 
-        messageBuffer := receiveEncryptedMessageBytes(connection, &disconnected)
-        println("disconnected", disconnected)
-        if messageBuffer != nil {
+        if messageBuffer := receiveEncryptedMessageBytes(connection, &disconnected); messageBuffer != nil {
             switch processEncryptedClientMessage(connectionId, messageBuffer) {
                 case flagFinishToReconnect: fallthrough
                 case flagFinishWithError: fallthrough
@@ -269,7 +267,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
                     closeConnection(false)
                     (*onShutDownRequested)()
                     return
-                default: {println("default")}
+                default: {}
             }
         }
 
@@ -311,13 +309,13 @@ func receiveEncryptedMessageBytes(connection *goNet.Conn, error *bool) []byte { 
     utils.Assert(error != nil)
 
     var size uint32 = 0
-    if !receive(connection, unsafe.Slice((*byte) (unsafe.Pointer(&size)), intSize), error) { println("remb 1", *error, size); return nil }
+    if !receive(connection, unsafe.Slice((*byte) (unsafe.Pointer(&size)), intSize), error) { return nil }
     utils.Assert(!*error && size > 0 && size <= uint32(crypto.EncryptedSize(maxMessageSize)))
 
     setConnectionTimeoutBetweenMessageParts(connection)
 
     buffer := make([]byte, size)
-    if !receive(connection, buffer, error) { println("remb 2", size); return nil }
+    if !receive(connection, buffer, error) { return nil }
 
     return buffer
 }
@@ -327,7 +325,6 @@ func processEncryptedClientMessage(connectionId uint32, messageBytes []byte) int
     utils.Assert(xCrypto != nil && len(messageBytes) > 0 && uint(len(messageBytes)) <= crypto.EncryptedSize(maxMessageSize))
 
     decrypted := xCrypto.Decrypt(messageBytes)
-    println(len(messageBytes), crypto.EncryptedSize(maxMessageSize), len(decrypted), maxMessageSize)
     utils.Assert(len(decrypted) > 0 && len(decrypted) <= int(maxMessageSize))
     message := unpackMessage(decrypted)
 
@@ -349,8 +346,7 @@ func sendMessage(connectionId uint32, msg *message) {
     utils.Assert(len(encrypted) > 0 && uint(len(encrypted)) <= crypto.EncryptedSize(maxMessageSize) && int(crypto.EncryptedSize(uint(len(packed)))) == len(encrypted))
 
     encryptedSize := uint32(len(encrypted))
-    println("sm", msg.flag, encryptedSize, len(encrypted))
-    send(connection, unsafe.Slice((*byte) (unsafe.Pointer(&encryptedSize)), intSize)) // TODO: unite size and packed bytes into one bytes buffer and send it once
+    send(connection, unsafe.Slice((*byte) (unsafe.Pointer(&encryptedSize)), intSize)) // TODO: unite size and packed bytes into one bytes buffer and send it once // <------------------------------------------------ !!!
 
     setConnectionTimeoutBetweenMessageParts(connection)
     send(connection, encrypted)
