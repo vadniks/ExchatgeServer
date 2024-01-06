@@ -314,7 +314,7 @@ func receiveEncryptedMessageBytes(connection *goNet.Conn, error *bool) []byte { 
     if !receive(connection, unsafe.Slice((*byte) (unsafe.Pointer(&size)), intSize), error) { println("remb 1", *error, size); return nil }
     utils.Assert(!*error && size > 0 && size <= uint32(crypto.EncryptedSize(maxMessageSize)))
 
-    //setConnectionTimeoutBetweenMessageParts(connection)
+    setConnectionTimeoutBetweenMessageParts(connection)
 
     buffer := make([]byte, size)
     if !receive(connection, buffer, error) { println("remb 2", size); return nil }
@@ -335,7 +335,7 @@ func processEncryptedClientMessage(connectionId uint32, messageBytes []byte) int
 
 //goland:noinspection GoRedundantConversion
 func sendMessage(connectionId uint32, msg *message) {
-    utils.Assert(int(msg.size) == len(msg.body) && len(msg.body) <= int(maxMessageBodySize))
+    utils.Assert(int(msg.size) == len(msg.body) && msg.size <= uint32(maxMessageBodySize))
 
     xCrypto := getCrypto(connectionId)
     utils.Assert(msg != nil && xCrypto != nil) // TODO: instead of asserting just return
@@ -351,6 +351,6 @@ func sendMessage(connectionId uint32, msg *message) {
     println("sm", msg.flag, encryptedSize, len(encrypted))
     send(connection, unsafe.Slice((*byte) (unsafe.Pointer(&encryptedSize)), intSize)) // TODO: unite size and packed bytes into one bytes buffer and send it once
 
-    //setConnectionTimeoutBetweenMessageParts(connection)
+    setConnectionTimeoutBetweenMessageParts(connection)
     send(connection, encrypted)
 }

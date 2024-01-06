@@ -274,14 +274,20 @@ func finishRequested(connectionId uint32) int32 {
 //goland:noinspection GoRedundantConversion
 func usersListRequested(connectionId uint32, userId uint32) int32 {
     sync.rwMutex.RLock()
+
     registeredUsers := database.GetAllUsers()
     var userInfosBytes []byte
 
-    infosPerMessage := uint32(maxMessageBodySize / userInfoSize)
+    infosPerMessage := uint32(math.Ceil(float64(maxMessageBodySize) / float64(userInfoSize)))
     utils.Assert(infosPerMessage <= uint32(maxMessageBodySize))
-    stubBytes := make([]byte, uint32(maxMessageBodySize) - infosPerMessage * uint32(userInfoSize))
 
-    var infosCount uint32 = 0
+    totalInfosCount := uint32(len(registeredUsers))
+    messagesCount := uint32(math.Ceil(float64(totalInfosCount) / float64(infosPerMessage)))
+
+    messageIndex := uint32(0)
+    totalRemainingInfos := len(registeredUsers)
+    infosCount := uint32(0)
+
     for _, user := range registeredUsers {
         _, xUser := getAuthorizedConnectedUser(user.Id)
 
@@ -294,40 +300,26 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
 
         userInfosBytes = append(userInfosBytes, xUserInfo.pack()...)
         infosCount++
+        totalRemainingInfos--
 
-        if infosCount % infosPerMessage == 0 {
-            userInfosBytes = append(userInfosBytes, stubBytes...)
-        }
-    }
+        if infosCount < infosPerMessage || totalRemainingInfos == 0 { continue }
+        size := infosCount * uint32(userInfoSize)
+        utils.Assert(len(userInfosBytes) == int(size))
 
-    messagesCount := uint32(math.Ceil(float64(infosCount) / float64(infosPerMessage)))
-    totalPayloadBytesSize := messagesCount * uint32(maxMessageBodySize)
-    userInfosBytes = append(userInfosBytes, make([]byte, totalPayloadBytesSize - uint32(len(userInfosBytes)))...)
-    utils.Assert(uint32(len(userInfosBytes)) == totalPayloadBytesSize)
-
-    var infosCountInMessage uint32
-    for messageIndex := uint32(0); messageIndex < messagesCount; messageIndex++ {
-
-        if infosCount > infosPerMessage * (messageIndex + 1) {
-            infosCountInMessage = infosPerMessage
-        } else {
-            infosCountInMessage = infosCount - infosPerMessage * messageIndex
-        }
-
-        nextPackedBytesStartIndex := messageIndex * uint32(maxMessageBodySize)
-        msg := &message{
+        sendMessage(connectionId, &message{
             flag: flagFetchUsers,
             timestamp: utils.CurrentTimeMillis(),
-            size: infosCountInMessage,
+            size: size,
             index: messageIndex,
             count: messagesCount,
             from: fromServer,
             to: userId,
             token: sync.tokenServer,
-            body: userInfosBytes[nextPackedBytesStartIndex:(nextPackedBytesStartIndex + uint32(maxMessageBodySize))],
-        }
+            body: userInfosBytes,
+        })
 
-        sendMessage(connectionId, msg)
+        userInfosBytes = []byte{}
+        infosCount = 0
     }
 
     sync.rwMutex.RUnlock()
