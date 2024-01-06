@@ -185,7 +185,7 @@ func parseCredentials(msg *message) (username []byte, unhashedPassword []byte) {
     copy(username, unsafe.Slice(&(msg.body[0]), usernameSize))
 
     unhashedPassword = make([]byte, UnhashedPasswordSize)
-    copy(unhashedPassword, unsafe.Slice(&(msg.body[usernameSize]), crypto.HashSize))
+    copy(unhashedPassword, unsafe.Slice(&(msg.body[usernameSize]), UnhashedPasswordSize))
 
     return username, unhashedPassword
 }
