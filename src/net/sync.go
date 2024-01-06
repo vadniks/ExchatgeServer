@@ -275,10 +275,19 @@ func finishRequested(connectionId uint32) int32 {
 func usersListRequested(connectionId uint32, userId uint32) int32 {
     sync.rwMutex.RLock()
 
-    registeredUsers := database.GetAllUsers()
+    var registeredUsers []database.User
+    for i := 0; i < 14; i++ {
+        registeredUsers = append(registeredUsers, database.User{
+            Id: uint32(i),
+            Name: []byte{byte(i), 0},
+            Password: []byte{},
+        })
+    }
+
+    //registeredUsers := database.GetAllUsers()
     var userInfosBytes []byte
 
-    infosPerMessage := uint32(math.Ceil(float64(maxMessageBodySize) / float64(userInfoSize)))
+    infosPerMessage := uint32(math.Floor(float64(maxMessageBodySize) / float64(userInfoSize)))
     utils.Assert(infosPerMessage <= uint32(maxMessageBodySize))
 
     totalInfosCount := uint32(len(registeredUsers))
@@ -304,6 +313,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
 
         if infosCount < infosPerMessage && totalRemainingInfos > 0 { continue }
         size := infosCount * uint32(userInfoSize)
+        println(len(userInfosBytes), int(size), infosCount, totalRemainingInfos)
         utils.Assert(len(userInfosBytes) == int(size))
 
         sendMessage(connectionId, &message{
@@ -319,7 +329,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
         })
         messageIndex++
 
-        userInfosBytes = []byte{}
+        userInfosBytes = nil
         infosCount = 0
     }
 
