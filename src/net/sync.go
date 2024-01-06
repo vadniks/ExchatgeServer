@@ -275,16 +275,7 @@ func finishRequested(connectionId uint32) int32 {
 func usersListRequested(connectionId uint32, userId uint32) int32 {
     sync.rwMutex.RLock()
 
-    var registeredUsers []database.User
-    for i := 0; i < 14; i++ {
-        registeredUsers = append(registeredUsers, database.User{
-            Id: uint32(i),
-            Name: []byte{byte(i), 0},
-            Password: []byte{},
-        })
-    }
-
-    //registeredUsers := database.GetAllUsers()
+    registeredUsers := database.GetAllUsers()
     var userInfosBytes []byte
 
     infosPerMessage := uint32(math.Floor(float64(maxMessageBodySize) / float64(userInfoSize)))
