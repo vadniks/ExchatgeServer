@@ -317,6 +317,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
             token: sync.tokenServer,
             body: userInfosBytes,
         })
+        messageIndex++
 
         userInfosBytes = []byte{}
         infosCount = 0
