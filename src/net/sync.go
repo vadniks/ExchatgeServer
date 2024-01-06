@@ -320,7 +320,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
         })
         messageIndex++
 
-        userInfosBytes = nil
+        userInfosBytes = []byte{}
         infosCount = 0
     }
 
