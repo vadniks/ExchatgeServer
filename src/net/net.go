@@ -327,6 +327,7 @@ func processEncryptedClientMessage(connectionId uint32, messageBytes []byte) int
     utils.Assert(xCrypto != nil && len(messageBytes) > 0 && uint(len(messageBytes)) <= crypto.EncryptedSize(maxMessageSize))
 
     decrypted := xCrypto.Decrypt(messageBytes)
+    println(len(messageBytes), crypto.EncryptedSize(maxMessageSize), len(decrypted), maxMessageSize)
     utils.Assert(len(decrypted) > 0 && len(decrypted) <= int(maxMessageSize))
     message := unpackMessage(decrypted)
 

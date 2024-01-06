@@ -131,9 +131,11 @@ func (crypto *Crypto) Decrypt(bytes []byte) []byte {
     utils.Assert(bytesSize > 0 && crypto.encoder != nil && crypto.decoder != nil)
     crypto.decoderBuffer.Write(bytes)
 
-    decrypted := make([]byte, bytesSize)
+    decryptedSize := bytesSize - encryptedAdditionalBytesSize
+    decrypted := make([]byte, decryptedSize)
+
     writtenCount, err := crypto.decoder.Read(decrypted)
-    if writtenCount != int(bytesSize - encryptedAdditionalBytesSize) || err != nil { return nil }
+    if writtenCount != int(decryptedSize) || err != nil { return nil }
 
     return decrypted
 }
