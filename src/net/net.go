@@ -349,10 +349,9 @@ func sendMessage(connectionId uint32, msg *message) {
 
     encryptedSize := uint32(len(encrypted))
 
-    var buffer []byte
-    buffer = append(buffer, unsafe.Slice((*byte) (unsafe.Pointer(&encryptedSize)), intSize)...)
-    buffer = append(buffer, encrypted...)
-    utils.Assert(len(buffer) == int(intSize + encryptedSize))
+    buffer := make([]byte, intSize + encryptedSize)
+    copy(buffer, unsafe.Slice((*byte) (unsafe.Pointer(&encryptedSize)), intSize))
+    copy(unsafe.Slice(&(buffer[intSize]), encryptedSize), encrypted)
 
     send(connection, buffer)
 }
