@@ -275,6 +275,8 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
             closeConnection(true)
             return
         }
+
+        time.Sleep(1e7 * 5) // 0.05 seconds
     }
 }
 
@@ -346,8 +348,11 @@ func sendMessage(connectionId uint32, msg *message) {
     utils.Assert(len(encrypted) > 0 && uint(len(encrypted)) <= crypto.EncryptedSize(maxMessageSize) && int(crypto.EncryptedSize(uint(len(packed)))) == len(encrypted))
 
     encryptedSize := uint32(len(encrypted))
-    send(connection, unsafe.Slice((*byte) (unsafe.Pointer(&encryptedSize)), intSize)) // TODO: unite size and packed bytes into one bytes buffer and send it once // <------------------------------------------------ !!!
 
-    setConnectionTimeoutBetweenMessageParts(connection)
-    send(connection, encrypted)
+    var buffer []byte
+    buffer = append(buffer, unsafe.Slice((*byte) (unsafe.Pointer(&encryptedSize)), intSize)...)
+    buffer = append(buffer, encrypted...)
+    utils.Assert(len(buffer) == int(intSize + encryptedSize))
+
+    send(connection, buffer)
 }
