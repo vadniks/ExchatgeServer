@@ -54,7 +54,7 @@ var tokenEncryptionKey = func() []byte {
     return key.Bytes
 }()
 
-func Initialize(serverSignSecretKey []byte) { signSecretKey = sodium.SignSecretKey{Bytes: serverSignSecretKey} }
+func Initialize(serverSignSecretKey []byte) { signSecretKey = sodium.SignSecretKey{Bytes: serverSignSecretKey} } // the sodium library is initialized via it's core module's init() - the language's feature to set up each file's state
 
 func GenerateServerKeys() ([]byte, []byte) {
     serverKeys := sodium.MakeKXKP()
@@ -63,7 +63,6 @@ func GenerateServerKeys() ([]byte, []byte) {
 
 func EncryptedSize(unencryptedSize uint) uint { return unencryptedSize + encryptedAdditionalBytesSize }
 func encryptedSingleSize(unencryptedSize uint) uint { return macSize + unencryptedSize + nonceSize }
-func SignedSize(unsignedSize uint) uint { return unsignedSize + SignatureSize }
 
 func ExchangeKeys(serverPublicKey []byte, serverSecretKey []byte, clientPublicKey []byte) ([]byte, []byte) { // returns nillable serverKey & clientKey
     utils.Assert(
@@ -225,7 +224,7 @@ func MakeServerToken(messageBodySize uint) [TokenSize]byte { // letting clients 
     utils.Assert(TokenSize == SignatureSize)
 
     unsigned := make([]byte, tokenUnencryptedValueSize)
-    for i, _ := range unsigned { unsigned[i] = (1 << 8) - 1 } // 255
+    for i := range unsigned { unsigned[i] = (1 << 8) - 1 } // 255
 
     signed := Sign(unsigned)
     utils.Assert(len(signed) - tokenUnencryptedValueSize == int(SignatureSize))
