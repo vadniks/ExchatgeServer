@@ -69,20 +69,37 @@ func TestPackMessage(t *testing.T) {
 // TODO: test if body is null
 
 func TestUnpackMessage(t *testing.T) {
-    packed := []byte{0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 6, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8}
+    first := true
+    begin:
+
+    var packed []byte
+    if first {
+        packed = []byte{0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 6, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8}
+    } else {
+        packed = []byte{0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 6, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7}
+    }
 
     unpacked := ((*netT) (nil)).unpackMessage(packed)
 
     if unpacked.flag != 0 { t.Error() }
     if unpacked.timestamp != 1 { t.Error() }
-    if unpacked.size != 2 { t.Error() }
+    if unpacked.size != func() uint32 { if first { return 2 } else { return 0 } }() { t.Error() }
     if unpacked.index != 3 { t.Error() }
     if unpacked.count != 4 { t.Error() }
     if unpacked.from != 5 { t.Error() }
     if unpacked.to != 6 { t.Error() }
 
-    if len(unpacked.body) != 2 { t.Error() }
-
     for _, i := range unpacked.token { if i != 7 { t.Error() } }
-    for _, i := range unpacked.body { if i != 8 { t.Error() } }
+
+    if first {
+        if len(unpacked.body) != 2 { t.Error() }
+        for _, i := range unpacked.body { if i != 8 { t.Error() } }
+    } else {
+        if unpacked.body != nil { t.Error() }
+    }
+
+    if first {
+        first = false
+        goto begin
+    }
 }
