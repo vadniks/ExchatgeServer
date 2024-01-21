@@ -109,5 +109,18 @@ func TestUnpackMessage(t *testing.T) {
 }
 
 func TestPackUserInfo(t *testing.T) {
+    name := [16]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf}
 
+    info := userInfo{
+        1,
+        true,
+        name,
+    }
+
+    packed := ((*netT) (nil)).packUserInfo(&info)
+
+    if packed[0] != 1 { t.Error() }
+    for _, i := range packed[1:4] { if i != 0 { t.Error() } }
+    if packed[4] != 1 { t.Error() }
+    if !bytes.Equal(packed[5:], name[:]) { t.Error() }
 }
