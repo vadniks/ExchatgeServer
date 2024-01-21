@@ -21,7 +21,8 @@ package crypto
 import (
     "bytes"
     "testing"
-    "unsafe"
+    "time"
+"unsafe"
 )
 
 func TestKeyExchange(t *testing.T) {
@@ -84,4 +85,15 @@ func TestSingleCrypt(t *testing.T) {
     if len(decrypted) == 0 { t.Error() }
 
     if !bytes.Equal(text, decrypted) { t.Error() }
+}
+
+func TestToken(t *testing.T) {
+    connectionId := uint32(time.Now().UnixMilli() & 0x7fffffff)
+    userId := uint32(time.Now().UnixMilli() & 0x7fffffff)
+
+    token := MakeToken(connectionId, userId)
+    xConnectionId, xUserId := OpenToken(token)
+
+    if xConnectionId == nil || xUserId == nil { t.Error() }
+    if connectionId != *xConnectionId || userId != *xUserId { t.Error() }
 }
