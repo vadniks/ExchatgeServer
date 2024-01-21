@@ -97,3 +97,16 @@ func TestToken(t *testing.T) {
     if xConnectionId == nil || xUserId == nil { t.Error() }
     if connectionId != *xConnectionId || userId != *xUserId { t.Error() }
 }
+
+func TestServerToken(t *testing.T) {
+    Initialize(make([]byte, SecretKeySize))
+
+    const size = 160
+    token := MakeServerToken(size)
+
+    value := uint64(0xffffffffffffffff)
+    //goland:noinspection GoRedundantConversion
+    signature := Sign(unsafe.Slice((*byte) (unsafe.Pointer(&value)), unsafe.Sizeof(value)))[:SignatureSize]
+
+    if !bytes.Equal(token[:], signature) { t.Error() }
+}
