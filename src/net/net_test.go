@@ -25,15 +25,22 @@ import (
 )
 
 func TestPackMessage(t *testing.T) {
+    first := true
+    begin:
+
     token := [64]byte{}
     for i := range token { token[i] = 7 }
 
-    body := []byte{8, 8}
+    var body []byte
+    if first { body = []byte{8, 8} } else { body = nil }
+
+    var size uint32
+    if first { size = 2 } else { size = 0 }
 
     packed := ((*netT) (nil)).packMessage(&message{
         flag: 0,
         timestamp: 1,
-        size: 2,
+        size: size,
         index: 3,
         count: 4,
         from: 5,
@@ -44,13 +51,19 @@ func TestPackMessage(t *testing.T) {
 
     if *((*int32) (unsafe.Pointer(&(packed[0])))) != 0 { t.Error() }
     if *((*uint64) (unsafe.Pointer(&(packed[4])))) != 1 { t.Error() }
-    if *((*uint32) (unsafe.Pointer(&(packed[4 + 8])))) != 2 { t.Error() }
+    if *((*uint32) (unsafe.Pointer(&(packed[4 + 8])))) != size { t.Error() }
     if *((*uint32) (unsafe.Pointer(&(packed[4 * 2 + 8])))) != 3 { t.Error() }
     if *((*uint32) (unsafe.Pointer(&(packed[4 * 3 + 8])))) != 4 { t.Error() }
     if *((*uint32) (unsafe.Pointer(&(packed[4 * 4 + 8])))) != 5 { t.Error() }
     if *((*uint32) (unsafe.Pointer(&(packed[4 * 5 + 8])))) != 6 { t.Error() }
     if !bytes.Equal(token[:], packed[(4 * 6 + 8):(4 * 6 + 8 + 64)]) { t.Error() }
-    if !bytes.Equal(body, packed[(4 * 6 + 8 + 64):]) { t.Error() }
+
+    if first { if !bytes.Equal(body, packed[(4 * 6 + 8 + 64):]) { t.Error() } } else { if len(packed) != 96 { t.Error() } }
+
+    if first {
+        first = false
+        goto begin
+    }
 }
 
 // TODO: test if body is null
