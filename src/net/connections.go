@@ -40,12 +40,12 @@ type connectionsT struct {
     rwMutex goSync.RWMutex
 }
 var connections = &connectionsT{
-    make(map[uint32]*connectedUser),
-    make(map[uint32]*uint32),
-    goSync.RWMutex{},
+   make(map[uint32]*connectedUser),
+   make(map[uint32]*uint32),
+   goSync.RWMutex{},
 }
 
-func addNewConnection(connectionId uint32, connection *goNet.Conn, coders *crypto.Coders) {
+func (connections *connectionsT) addNewConnection(connectionId uint32, connection *goNet.Conn, coders *crypto.Coders) {
     connections.rwMutex.Lock()
 
     _, ok := connections.connectedUsers[connectionId]
@@ -62,7 +62,7 @@ func addNewConnection(connectionId uint32, connection *goNet.Conn, coders *crypt
     connections.rwMutex.Unlock()
 }
 
-func getConnectedUser(connectionId uint32) *connectedUser { // nillable result
+func (connections *connectionsT) getConnectedUser(connectionId uint32) *connectedUser { // nillable result
     connections.rwMutex.RLock()
     value, ok := connections.connectedUsers[connectionId]
     connections.rwMutex.RUnlock()
@@ -75,26 +75,26 @@ func getConnectedUser(connectionId uint32) *connectedUser { // nillable result
     }
 }
 
-func getCoders(connectionId uint32) *crypto.Coders { // nillable result
-    xConnectedUser := getConnectedUser(connectionId)
+func (connections *connectionsT) getCoders(connectionId uint32) *crypto.Coders { // nillable result
+    xConnectedUser := connections.getConnectedUser(connectionId)
     if xConnectedUser == nil { return nil }
     return xConnectedUser.coders
 }
 
-func getConnection(connectionId uint32) *goNet.Conn { // nillable result
-    xConnectedUser := getConnectedUser(connectionId)
+func (connections *connectionsT) getConnection(connectionId uint32) *goNet.Conn { // nillable result
+    xConnectedUser := connections.getConnectedUser(connectionId)
     if xConnectedUser == nil { return nil }
     return xConnectedUser.connection
 }
 
-func getConnectionState(connectionId uint32) *uint { // nillable result
-    xConnectedUser := getConnectedUser(connectionId)
+func (connections *connectionsT) getConnectionState(connectionId uint32) *uint { // nillable result
+    xConnectedUser := connections.getConnectedUser(connectionId)
     if xConnectedUser == nil { return nil }
     return &(xConnectedUser.state)
 }
 
-func setConnectionState(connectionId uint32, state uint) bool { // returns true on success
-    xConnectedUser := getConnectedUser(connectionId)
+func (connections *connectionsT) setConnectionState(connectionId uint32, state uint) bool { // returns true on success
+    xConnectedUser := connections.getConnectedUser(connectionId)
     if xConnectedUser == nil { return false }
 
     connections.rwMutex.Lock()
@@ -104,18 +104,18 @@ func setConnectionState(connectionId uint32, state uint) bool { // returns true 
     return true
 }
 
-func getUser(connectionId uint32) *database.User { // nillable result
-    xConnectedUser := getConnectedUser(connectionId)
+func (connections *connectionsT) getUser(connectionId uint32) *database.User { // nillable result
+    xConnectedUser := connections.getConnectedUser(connectionId)
     if xConnectedUser == nil { return nil }
     return xConnectedUser.user
 }
 
-func setUser(connectionId uint32, user *database.User) bool { // returns true on success
-    connectedUser := getConnectedUser(connectionId)
-    if connectedUser == nil { return false }
+func (connections *connectionsT) setUser(connectionId uint32, user *database.User) bool { // returns true on success
+    xConnectedUser := connections.getConnectedUser(connectionId)
+    if xConnectedUser == nil { return false }
     connections.rwMutex.Lock()
 
-    connectedUser.user = user
+    xConnectedUser.user = user
 
     _, ok := connections.ids[user.Id]
     utils.Assert(!ok)
@@ -128,13 +128,13 @@ func setUser(connectionId uint32, user *database.User) bool { // returns true on
     return true
 }
 
-func getConnectedUserId(connectionId uint32) *uint32 { // nillable result
-    user := getUser(connectionId)
+func (connections *connectionsT) getConnectedUserId(connectionId uint32) *uint32 { // nillable result
+    user := connections.getUser(connectionId)
     if user == nil { return nil }
     return &(user.Id)
 }
 
-func getAuthorizedConnectedUser(userId uint32) (uint32, *database.User) { // nillable second result
+func (connections *connectionsT) getAuthorizedConnectedUser(userId uint32) (uint32, *database.User) { // nillable second result
     connections.rwMutex.RLock()
     connectionId := connections.ids[userId]
 
@@ -143,18 +143,18 @@ func getAuthorizedConnectedUser(userId uint32) (uint32, *database.User) { // nil
         return 0, nil
     }
 
-    connectedUser, ok := connections.connectedUsers[*connectionId]
+    xConnectedUser, ok := connections.connectedUsers[*connectionId]
     connections.rwMutex.RUnlock()
     if !ok { return 0, nil }
 
-    if user := connectedUser.user; user == nil {
+    if user := xConnectedUser.user; user == nil {
         return 0, nil
     } else {
-        return *connectionId, connectedUser.user
+        return *connectionId, xConnectedUser.user
     }
 }
 
-func checkConnectionTimeouts(action func(xConnectedUser *connectedUser)) {
+func (connections *connectionsT) checkConnectionTimeouts(action func(xConnectedUser *connectedUser)) {
     connections.rwMutex.Lock()
 
     for _, xConnectedUser := range connections.connectedUsers {
@@ -166,7 +166,7 @@ func checkConnectionTimeouts(action func(xConnectedUser *connectedUser)) {
     connections.rwMutex.Unlock()
 }
 
-func doForEachConnectedAuthorizedUser(action func (connectionId uint32, user *connectedUser)) {
+func (connections *connectionsT) doForEachConnectedAuthorizedUser(action func (connectionId uint32, user *connectedUser)) {
     connections.rwMutex.RLock()
 
     for connectionId, xConnectedUser := range connections.connectedUsers {
@@ -176,14 +176,14 @@ func doForEachConnectedAuthorizedUser(action func (connectionId uint32, user *co
     connections.rwMutex.RUnlock()
 }
 
-func deleteConnection(connectionId uint32) bool { // returns true on success
-    connectedUser := getConnectedUser(connectionId)
-    if connectedUser == nil { return false }
+func (connections *connectionsT) deleteConnection(connectionId uint32) bool { // returns true on success
+    xConnectedUser := connections.getConnectedUser(connectionId)
+    if xConnectedUser == nil { return false }
 
     connections.rwMutex.Lock()
 
     delete(connections.connectedUsers, connectionId)
-    if user := connectedUser.user; user != nil { delete(connections.ids, user.Id) }
+    if user := xConnectedUser.user; user != nil { delete(connections.ids, user.Id) }
 
     connections.rwMutex.Unlock()
     return true

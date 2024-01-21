@@ -158,7 +158,7 @@ func broadcastRequested(connectionId uint32, user *database.User, msg *message) 
     utils.Assert(user != nil && msg.to == toServer && msg.size > 0 && msg.body != nil)
     if !database.IsAdmin(user) { return kickUserCuzOfDenialOfAccess(flagBroadcast, connectionId, user.Id) }
 
-    doForEachConnectedAuthorizedUser(func(connectionId uint32, xUser *connectedUser) {
+    connections.doForEachConnectedAuthorizedUser(func(connectionId uint32, xUser *connectedUser) {
         if xUser.user.Id == user.Id { return }
         sendMessage(connectionId, &message{ // TODO: move outside lambda and only change the toId
             flag: flagBroadcast,
@@ -179,7 +179,7 @@ func broadcastRequested(connectionId uint32, user *database.User, msg *message) 
 func proceedRequested(msg *message) int32 {
     utils.Assert(msg != nil && msg.to != msg.from && msg.size > 0 && msg.body != nil)
 
-    if toUserConnectionId, toUser := getAuthorizedConnectedUser(msg.to); toUser != nil {
+    if toUserConnectionId, toUser := connections.getAuthorizedConnectedUser(msg.to); toUser != nil {
         sendMessage(toUserConnectionId, msg)
     }
 
@@ -218,7 +218,7 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
     user := database.FindUser(username, unhashedPassword)
 
     var xConnectedUser *database.User = nil
-    if user != nil { _, xConnectedUser = getAuthorizedConnectedUser(user.Id) }
+    if user != nil { _, xConnectedUser = connections.getAuthorizedConnectedUser(user.Id) }
 
     if user == nil || xConnectedUser != nil {
         sync.rwMutex.Unlock()
@@ -227,8 +227,8 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
         return flagFinishWithError
     }
 
-    setUser(connectionId, user)
-    setConnectionState(connectionId, stateLoggedWithCredentials)
+    connections.setUser(connectionId, user)
+    connections.setConnectionState(connectionId, stateLoggedWithCredentials)
 
     token := crypto.MakeToken(connectionId, user.Id) // won't compile if inline the variable
     sync.rwMutex.Unlock()
@@ -279,7 +279,7 @@ func registrationWithCredentialsRequested(connectionId uint32, msg *message) int
 
 func finishRequested(connectionId uint32) int32 {
     sync.rwMutex.Lock() // TODO: redundant locks usage here
-    deleteConnection(connectionId)
+    connections.deleteConnection(connectionId)
     sync.rwMutex.Unlock()
     return flagFinish
 }
@@ -302,7 +302,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
     infosCount := uint32(0)
 
     for _, user := range registeredUsers {
-        _, xUser := getAuthorizedConnectedUser(user.Id)
+        _, xUser := connections.getAuthorizedConnectedUser(user.Id)
 
         xUserInfo := &userInfo{
             id: user.Id,
@@ -419,9 +419,9 @@ func routeMessage(connectionId uint32, msg *message) int32 {
 
     sync.rwMutex.Lock()
 
-    state := getConnectionState(connectionId)
+    state := connections.getConnectionState(connectionId)
     utils.Assert(state != nil)
-    userId := getConnectedUserId(connectionId)
+    userId := connections.getConnectedUserId(connectionId)
 
     interruptConnection := func(flag int32, to uint32) {
         sendMessage(connectionId, errorMessage(flag, to))
@@ -440,7 +440,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
             return flagFinishWithError
         }
 
-        setConnectionState(connectionId, stateSecureConnectionEstablished)
+        connections.setConnectionState(connectionId, stateSecureConnectionEstablished)
     } else {
         if !(*state > stateConnected &&
             userId != nil &&
@@ -484,7 +484,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
 
     switch flag {
         case flagShutdown:
-            return shutdownRequested(connectionId, getUser(connectionId), msg)
+            return shutdownRequested(connectionId, connections.getUser(connectionId), msg)
         case flagExchangeKeys: fallthrough
         case flagExchangeKeysDone: fallthrough
         case flagExchangeHeaders: fallthrough
@@ -504,7 +504,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
         case flagFetchMessages:
             return doIfToServerOrInterrupt(func() int32 { return messagesRequested(connectionId, msg) })
         case flagBroadcast:
-            return broadcastRequested(connectionId, getUser(connectionId), msg)
+            return broadcastRequested(connectionId, connections.getUser(connectionId), msg)
         default:
             interruptConnection(flagError, msg.from)
             return flagFinishWithError

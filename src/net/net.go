@@ -193,7 +193,7 @@ func sendDenialOfService(listener goNet.Listener) {
 
 func watchConnectionTimeouts(acceptingClients *atomic.Bool) {
     for acceptingClients.Load() {
-        checkConnectionTimeouts(func(xConnectedUser *connectedUser) {
+        connections.checkConnectionTimeouts(func(xConnectedUser *connectedUser) {
             utils.Assert((*(xConnectedUser.connection)).SetDeadline(time.UnixMilli(int64(utils.CurrentTimeMillis() + 100))) == nil)
         })
         time.Sleep(1e8) // 100 milliseconds = 100 * 1000 000 nanoseconds = 0.1 seconds
@@ -212,10 +212,10 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
 
     closeConnection := func(disconnectedByClient bool) {
         if disconnectedByClient {
-            utils.Assert(getConnectedUser(connectionId) != nil)
-            deleteConnection(connectionId)
+            utils.Assert(connections.getConnectedUser(connectionId) != nil)
+            connections.deleteConnection(connectionId)
         } else {
-            utils.Assert(getConnectedUser(connectionId) == nil)
+            utils.Assert(connections.getConnectedUser(connectionId) == nil)
         }
 
         net.connectionIdsPool.ReturnId(connectionId)
@@ -252,7 +252,7 @@ func processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSyn
         return
     }
 
-    addNewConnection(connectionId, connection, xCrypto)
+    connections.addNewConnection(connectionId, connection, xCrypto)
     for {
         disconnected := false
 
@@ -323,7 +323,7 @@ func receiveEncryptedMessageBytes(connection *goNet.Conn, error *bool) []byte { 
 }
 
 func processEncryptedClientMessage(connectionId uint32, messageBytes []byte) int32 {
-    coders := getCoders(connectionId)
+    coders := connections.getCoders(connectionId)
     utils.Assert(coders != nil && len(messageBytes) > 0 && uint(len(messageBytes)) <= crypto.EncryptedSize(maxMessageSize))
 
     decrypted := coders.Decrypt(messageBytes)
@@ -337,10 +337,10 @@ func processEncryptedClientMessage(connectionId uint32, messageBytes []byte) int
 func sendMessage(connectionId uint32, msg *message) {
     utils.Assert(int(msg.size) == len(msg.body) && msg.size <= uint32(maxMessageBodySize))
 
-    coders := getCoders(connectionId)
+    coders := connections.getCoders(connectionId)
     utils.Assert(msg != nil && coders != nil) // TODO: instead of asserting just return
 
-    connection := getConnection(connectionId)
+    connection := connections.getConnection(connectionId)
     utils.Assert(connection != nil)
 
     packed := msg.pack()
