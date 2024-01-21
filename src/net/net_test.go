@@ -24,6 +24,12 @@ import (
     "unsafe"
 )
 
+//goland:noinspection GoRedundantConversion
+func TestEndianness(t *testing.T) {
+    var a uint64 = 0x0123456789abcdef
+    if (unsafe.Slice((*byte) (unsafe.Pointer(&a)), unsafe.Sizeof(a)))[0] != 0xef { t.Error() }
+}
+
 func TestPackMessage(t *testing.T) {
     first := true
     begin:
@@ -100,4 +106,8 @@ func TestUnpackMessage(t *testing.T) {
         first = false
         goto begin
     }
+}
+
+func TestPackUserInfo(t *testing.T) {
+
 }
