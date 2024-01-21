@@ -132,7 +132,7 @@ func serverMessage(xFlag int32, xTo uint32, xBody []byte /*nillable*/) *message 
 }
 
 func kickUserCuzOfDenialOfAccess(originalFlag int32, connectionId uint32, userId uint32) int32 {
-    sendMessage(connectionId, errorMessage(originalFlag, userId))
+    Net.sendMessage(connectionId, errorMessage(originalFlag, userId))
     finishRequested(connectionId)
     return flagFinishWithError
 }
@@ -160,7 +160,7 @@ func broadcastRequested(connectionId uint32, user *database.User, msg *message) 
 
     connections.doForEachConnectedAuthorizedUser(func(connectionId uint32, xUser *connectedUser) {
         if xUser.user.Id == user.Id { return }
-        sendMessage(connectionId, &message{ // TODO: move outside lambda and only change the toId
+        Net.sendMessage(connectionId, &message{ // TODO: move outside lambda and only change the toId
             flag: flagBroadcast,
             timestamp: utils.CurrentTimeMillis(),
             size: msg.size,
@@ -180,7 +180,7 @@ func proceedRequested(msg *message) int32 {
     utils.Assert(msg != nil && msg.to != msg.from && msg.size > 0 && msg.body != nil)
 
     if toUserConnectionId, toUser := connections.getAuthorizedConnectedUser(msg.to); toUser != nil {
-        sendMessage(toUserConnectionId, msg)
+        Net.sendMessage(toUserConnectionId, msg)
     }
 
     if msg.flag != flagProceed { return flagProceed } // since this function is called not only with actual proceed but with exchange* flags too. Others are ignored by the server cuz it's clients' deal to handle 'em
@@ -222,7 +222,7 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
 
     if user == nil || xConnectedUser != nil {
         sync.rwMutex.Unlock()
-        sendMessage(connectionId, errorMessage(flagLogIn, toAnonymous))
+        Net.sendMessage(connectionId, errorMessage(flagLogIn, toAnonymous))
         finishRequested(connectionId)
         return flagFinishWithError
     }
@@ -232,7 +232,7 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
 
     token := crypto.MakeToken(connectionId, user.Id) // won't compile if inline the variable
     sync.rwMutex.Unlock()
-    sendMessage(connectionId, serverMessage(flagLoggedIn, user.Id, token[:])) // here's how a client obtains his id
+    Net.sendMessage(connectionId, serverMessage(flagLoggedIn, user.Id, token[:])) // here's how a client obtains his id
     return flagProceed
 }
 
@@ -242,7 +242,7 @@ func registrationWithCredentialsRequested(connectionId uint32, msg *message) int
     sync.rwMutex.Lock()
     if database.GetUsersCount() >= sync.maxUsersCount {
         sync.rwMutex.Unlock()
-        sendMessage(connectionId, errorMessage(flagRegister, toAnonymous))
+        Net.sendMessage(connectionId, errorMessage(flagRegister, toAnonymous))
         finishRequested(connectionId)
         return flagFinishWithError
     }
@@ -269,7 +269,7 @@ func registrationWithCredentialsRequested(connectionId uint32, msg *message) int
     successful := user != nil
 
     sync.rwMutex.Unlock()
-    sendMessage(connectionId, func() *message { // Lack of ternary operator is awful. Presence of closures/anonymous functions is great.
+    Net.sendMessage(connectionId, func() *message { // Lack of ternary operator is awful. Presence of closures/anonymous functions is great.
         if successful { return simpleServerMessage(flagRegistered, user.Id) } else { return errorMessage(flagRegister, toAnonymous) }
     }())
 
@@ -311,7 +311,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
         }
         copy(unsafe.Slice((*byte) (unsafe.Pointer(&(xUserInfo.name))), usernameSize), user.Name)
 
-        userInfosBytes = append(userInfosBytes, xUserInfo.pack()...)
+        userInfosBytes = append(userInfosBytes, Net.packUserInfo(xUserInfo)...)
         infosCount++
         totalRemainingInfos--
 
@@ -319,7 +319,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
         size := infosCount * uint32(userInfoSize)
         utils.Assert(len(userInfosBytes) == int(size))
 
-        sendMessage(connectionId, &message{
+        Net.sendMessage(connectionId, &message{
             flag: flagFetchUsers,
             timestamp: utils.CurrentTimeMillis(),
             size: size,
@@ -365,7 +365,7 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
     }
 
     if !database.UserExists(fromUser) {
-        sendMessage(connectionId, errorMessage(flagFetchMessages, msg.from))
+        Net.sendMessage(connectionId, errorMessage(flagFetchMessages, msg.from))
         return flagError
     }
 
@@ -381,7 +381,7 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
         replyBody = append(replyBody, unsafe.Slice((*byte) (unsafe.Pointer(&afterTimestamp)), longSize)...)
         replyBody = append(replyBody, unsafe.Slice((*byte) (unsafe.Pointer(&fromUser)), intSize)...)
 
-        sendMessage(connectionId, &message{
+        Net.sendMessage(connectionId, &message{
             flagFetchMessages,
             utils.CurrentTimeMillis(),
             uint32(1 + longSize + intSize),
@@ -396,7 +396,7 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
     }
 
     for index, xMessage := range messages {
-        sendMessage(connectionId, &message{
+        Net.sendMessage(connectionId, &message{
             flagFetchMessages,
             xMessage.Timestamp,
             uint32(len(xMessage.Body)),
@@ -424,7 +424,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     userId := connections.getConnectedUserId(connectionId)
 
     interruptConnection := func(flag int32, to uint32) {
-        sendMessage(connectionId, errorMessage(flag, to))
+        Net.sendMessage(connectionId, errorMessage(flag, to))
         finishRequested(connectionId)
     }
 
@@ -468,7 +468,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     sync.rwMutex.Unlock()
 
     if shuttingDown {
-        sendMessage(connectionId, simpleServerMessage(flagError, *userId))
+        Net.sendMessage(connectionId, simpleServerMessage(flagError, *userId))
         finishRequested(connectionId)
         return flagFinishWithError
     }

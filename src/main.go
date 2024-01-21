@@ -83,7 +83,7 @@ func main() {
     net.Initialize(xOptions.MaxUsersCount, xOptions.MaxTimeMillisToPreserveActiveConnection, xOptions.MaxTimeMillisIntervalBetweenMessages)
     println("initialized; running")
 
-    net.ProcessClients(xOptions.Host, xOptions.Port)
+    net.Net.ProcessClients(xOptions.Host, xOptions.Port)
 
     println("shutting down...")
     database.Destroy()

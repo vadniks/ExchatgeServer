@@ -39,7 +39,7 @@ type connectionsT struct {
     ids map[uint32/*userId*/]*uint32/*connectionId*/ // nillable values
     rwMutex goSync.RWMutex
 }
-var connections = &connectionsT{
+var connections = &connectionsT{ // aka singleton
    make(map[uint32]*connectedUser),
    make(map[uint32]*uint32),
    goSync.RWMutex{},
@@ -158,7 +158,7 @@ func (connections *connectionsT) checkConnectionTimeouts(action func(xConnectedU
     connections.rwMutex.Lock()
 
     for _, xConnectedUser := range connections.connectedUsers {
-        if utils.CurrentTimeMillis() - xConnectedUser.connectedMillis > net.maxTimeMillisToPreserveActiveConnection {
+        if utils.CurrentTimeMillis() - xConnectedUser.connectedMillis > Net.maxTimeMillisToPreserveActiveConnection {
             action(xConnectedUser)
         }
     }
