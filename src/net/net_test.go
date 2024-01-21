@@ -66,8 +66,6 @@ func TestPackMessage(t *testing.T) {
     }
 }
 
-// TODO: test if body is null
-
 func TestUnpackMessage(t *testing.T) {
     first := true
     begin:
