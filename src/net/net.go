@@ -323,10 +323,10 @@ func receiveEncryptedMessageBytes(connection *goNet.Conn, error *bool) []byte { 
 }
 
 func processEncryptedClientMessage(connectionId uint32, messageBytes []byte) int32 {
-    xCrypto := getCrypto(connectionId)
-    utils.Assert(xCrypto != nil && len(messageBytes) > 0 && uint(len(messageBytes)) <= crypto.EncryptedSize(maxMessageSize))
+    coders := getCoders(connectionId)
+    utils.Assert(coders != nil && len(messageBytes) > 0 && uint(len(messageBytes)) <= crypto.EncryptedSize(maxMessageSize))
 
-    decrypted := xCrypto.Decrypt(messageBytes)
+    decrypted := coders.Decrypt(messageBytes)
     utils.Assert(len(decrypted) > 0 && len(decrypted) <= int(maxMessageSize))
     message := unpackMessage(decrypted)
 
@@ -337,14 +337,14 @@ func processEncryptedClientMessage(connectionId uint32, messageBytes []byte) int
 func sendMessage(connectionId uint32, msg *message) {
     utils.Assert(int(msg.size) == len(msg.body) && msg.size <= uint32(maxMessageBodySize))
 
-    xCrypto := getCrypto(connectionId)
-    utils.Assert(msg != nil && xCrypto != nil) // TODO: instead of asserting just return
+    coders := getCoders(connectionId)
+    utils.Assert(msg != nil && coders != nil) // TODO: instead of asserting just return
 
     connection := getConnection(connectionId)
     utils.Assert(connection != nil)
 
     packed := msg.pack()
-    encrypted := xCrypto.Encrypt(packed)
+    encrypted := coders.Encrypt(packed)
     utils.Assert(len(encrypted) > 0 && uint(len(encrypted)) <= crypto.EncryptedSize(maxMessageSize) && int(crypto.EncryptedSize(uint(len(packed)))) == len(encrypted))
 
     encryptedSize := uint32(len(encrypted))

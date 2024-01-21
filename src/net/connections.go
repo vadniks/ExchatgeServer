@@ -19,7 +19,7 @@
 package net
 
 import (
-    xCrypto "ExchatgeServer/crypto"
+    "ExchatgeServer/crypto"
     "ExchatgeServer/database"
     "ExchatgeServer/utils"
     goNet "net"
@@ -28,7 +28,7 @@ import (
 
 type connectedUser struct {
     connection *goNet.Conn
-    crypto *xCrypto.Crypto
+    coders *crypto.Coders
     user *database.User // nillable
     state uint
     connectedMillis uint64
@@ -45,7 +45,7 @@ var connections = &connectionsT{
     goSync.RWMutex{},
 }
 
-func addNewConnection(connectionId uint32, connection *goNet.Conn, xxCrypto *xCrypto.Crypto) {
+func addNewConnection(connectionId uint32, connection *goNet.Conn, coders *crypto.Coders) {
     connections.rwMutex.Lock()
 
     _, ok := connections.connectedUsers[connectionId]
@@ -53,7 +53,7 @@ func addNewConnection(connectionId uint32, connection *goNet.Conn, xxCrypto *xCr
 
     connections.connectedUsers[connectionId] = &connectedUser{
         connection: connection,
-        crypto: xxCrypto,
+        coders: coders,
         user: nil,
         state: stateConnected,
         connectedMillis: utils.CurrentTimeMillis(),
@@ -75,10 +75,10 @@ func getConnectedUser(connectionId uint32) *connectedUser { // nillable result
     }
 }
 
-func getCrypto(connectionId uint32) *xCrypto.Crypto { // nillable result
+func getCoders(connectionId uint32) *crypto.Coders { // nillable result
     xConnectedUser := getConnectedUser(connectionId)
     if xConnectedUser == nil { return nil }
-    return xConnectedUser.crypto
+    return xConnectedUser.coders
 }
 
 func getConnection(connectionId uint32) *goNet.Conn { // nillable result

@@ -38,7 +38,7 @@ const tokenTrailingSize uint = 16
 const TokenSize = tokenUnencryptedValueSize + 40 + tokenTrailingSize // 48 + 16 = 64 = 2 encrypted ints + mac + nonce + missing bytes to reach signatureSize so the server can tokenize itself via signature whereas for clients server encrypts 2 ints (connectionId, userId)
 const SecretKeySize = SignatureSize
 
-type Crypto struct {
+type Coders struct {
     encoderBuffer *xBytes.Buffer
     decoderBuffer *xBytes.Buffer
     encoder sodium.SecretStreamEncoder
@@ -84,11 +84,11 @@ func ExchangeKeys(serverPublicKey []byte, serverSecretKey []byte, clientPublicKe
     }
 }
 
-func CreateEncoderStream(serverKey []byte) ([]byte, *Crypto) { // returns server stream header
+func CreateEncoderStream(serverKey []byte) ([]byte, *Coders) { // returns server stream header
     utils.Assert(len(serverKey) == int(KeySize))
 
     encoderBuffer := new(xBytes.Buffer)
-    crypto := &Crypto{
+    crypto := &Coders{
         encoderBuffer,
         new(xBytes.Buffer),
         sodium.MakeSecretStreamXCPEncoder(sodium.SecretStreamXCPKey{Bytes: serverKey}, encoderBuffer),
@@ -98,42 +98,42 @@ func CreateEncoderStream(serverKey []byte) ([]byte, *Crypto) { // returns server
     return crypto.encoder.Header().Bytes, crypto
 }
 
-func (crypto *Crypto) CreateDecoderStream(clientKey []byte, clientStreamHeader []byte) bool { // returns true on success
+func (coders *Coders) CreateDecoderStream(clientKey []byte, clientStreamHeader []byte) bool { // returns true on success
     utils.Assert(len(clientKey) == int(KeySize) && len(clientStreamHeader) == int(HeaderSize))
 
     var err error
-    crypto.decoder, err = sodium.MakeSecretStreamXCPDecoder(
+    coders.decoder, err = sodium.MakeSecretStreamXCPDecoder(
         sodium.SecretStreamXCPKey{Bytes: clientKey},
-        crypto.decoderBuffer,
+        coders.decoderBuffer,
         sodium.SecretStreamXCPHeader{Bytes: clientStreamHeader},
     )
     return err == nil
 }
 
-func (crypto *Crypto) Encrypt(bytes []byte) []byte { // nillable result
+func (coders *Coders) Encrypt(bytes []byte) []byte { // nillable result
     bytesSize := uint(len(bytes))
-    utils.Assert(bytesSize > 0 && crypto.encoder != nil && crypto.decoder != nil)
+    utils.Assert(bytesSize > 0 && coders.encoder != nil && coders.decoder != nil)
     encryptedSize := EncryptedSize(bytesSize)
 
-    writtenCount, err := crypto.encoder.Write(bytes)
+    writtenCount, err := coders.encoder.Write(bytes)
     if writtenCount != int(encryptedSize) || err != nil { return nil }
 
     encrypted := make([]byte, encryptedSize)
-    writtenCount, err = crypto.encoderBuffer.Read(encrypted)
+    writtenCount, err = coders.encoderBuffer.Read(encrypted)
     if writtenCount != int(encryptedSize) || err != nil { return nil }
 
     return encrypted
 }
 
-func (crypto *Crypto) Decrypt(bytes []byte) []byte {
+func (coders *Coders) Decrypt(bytes []byte) []byte {
     bytesSize := uint(len(bytes))
-    utils.Assert(bytesSize > 0 && crypto.encoder != nil && crypto.decoder != nil)
-    crypto.decoderBuffer.Write(bytes)
+    utils.Assert(bytesSize > 0 && coders.encoder != nil && coders.decoder != nil)
+    coders.decoderBuffer.Write(bytes)
 
     decryptedSize := bytesSize - encryptedAdditionalBytesSize
     decrypted := make([]byte, decryptedSize)
 
-    writtenCount, err := crypto.decoder.Read(decrypted)
+    writtenCount, err := coders.decoder.Read(decrypted)
     if writtenCount != int(decryptedSize) || err != nil { return nil }
 
     return decrypted
