@@ -22,7 +22,7 @@ import (
     "bytes"
     "testing"
     "time"
-"unsafe"
+    "unsafe"
 )
 
 func TestKeyExchange(t *testing.T) {
