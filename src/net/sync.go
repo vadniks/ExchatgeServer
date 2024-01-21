@@ -71,9 +71,10 @@ type syncT struct {
     shuttingDown bool
 }
 
-var sync *syncT = nil
+var sync *syncT = nil // aka singleton
 
 func syncInitialize(maxUsersCount uint) {
+    utils.Assert(sync == nil)
     sync = &syncT{
         uint32(maxUsersCount),
         make([]byte, crypto.TokenSize), // all zeroes
@@ -83,7 +84,7 @@ func syncInitialize(maxUsersCount uint) {
     }
 }
 
-func simpleServerMessage(xFlag int32, xTo uint32) *message {
+func (sync *syncT) simpleServerMessage(xFlag int32, xTo uint32) *message {
     return &message{
         flag: xFlag,
         timestamp: utils.CurrentTimeMillis(),
@@ -98,7 +99,7 @@ func simpleServerMessage(xFlag int32, xTo uint32) *message {
 }
 
 //goland:noinspection GoRedundantConversion
-func errorMessage(originalFlag int32, xTo uint32) *message { // if originalFlag is flagError too, that means it's an unspecified general error or a state violation (replacement of assert)
+func (sync *syncT) errorMessage(originalFlag int32, xTo uint32) *message { // if originalFlag is flagError too, that means it's an unspecified general error or a state violation (replacement of assert)
     return &message{
         flag: flagError,
         timestamp: utils.CurrentTimeMillis(),
@@ -112,7 +113,7 @@ func errorMessage(originalFlag int32, xTo uint32) *message { // if originalFlag 
     }
 }
 
-func serverMessage(xFlag int32, xTo uint32, xBody []byte /*nillable*/) *message {
+func (sync *syncT) serverMessage(xFlag int32, xTo uint32, xBody []byte /*nillable*/) *message {
     bodySize := len(xBody)
     utils.Assert(bodySize > 0 && bodySize <= int(maxMessageBodySize))
 
@@ -131,17 +132,17 @@ func serverMessage(xFlag int32, xTo uint32, xBody []byte /*nillable*/) *message 
     return result
 }
 
-func kickUserCuzOfDenialOfAccess(originalFlag int32, connectionId uint32, userId uint32) int32 {
-    Net.sendMessage(connectionId, errorMessage(originalFlag, userId))
-    finishRequested(connectionId)
+func (sync *syncT) kickUserCuzOfDenialOfAccess(originalFlag int32, connectionId uint32, userId uint32) int32 {
+    Net.sendMessage(connectionId, sync.errorMessage(originalFlag, userId))
+    sync.finishRequested(connectionId)
     return flagFinishWithError
 }
 
-func shutdownRequested(connectionId uint32, user *database.User, msg *message) int32 { // TODO: add more administrative actions, such as: logging in and registration blocking, user ban...
+func (sync *syncT) shutdownRequested(connectionId uint32, user *database.User, msg *message) int32 { // TODO: add more administrative actions, such as: logging in and registration blocking, user ban...
     utils.Assert(user != nil && msg.to == toServer && msg.size == 0)
-    if !database.IsAdmin(user) { return kickUserCuzOfDenialOfAccess(flagShutdown, connectionId, user.Id) }
+    if !database.IsAdmin(user) { return sync.kickUserCuzOfDenialOfAccess(flagShutdown, connectionId, user.Id) }
 
-    finishRequested(connectionId)
+    sync.finishRequested(connectionId)
 
     sync.rwMutex.Lock()
     sync.shuttingDown = true
@@ -154,9 +155,9 @@ func shutdownRequested(connectionId uint32, user *database.User, msg *message) i
     return flagShutdown
 }
 
-func broadcastRequested(connectionId uint32, user *database.User, msg *message) int32 {
+func (sync *syncT) broadcastRequested(connectionId uint32, user *database.User, msg *message) int32 {
     utils.Assert(user != nil && msg.to == toServer && msg.size > 0 && msg.body != nil)
-    if !database.IsAdmin(user) { return kickUserCuzOfDenialOfAccess(flagBroadcast, connectionId, user.Id) }
+    if !database.IsAdmin(user) { return sync.kickUserCuzOfDenialOfAccess(flagBroadcast, connectionId, user.Id) }
 
     connections.doForEachConnectedAuthorizedUser(func(connectionId uint32, xUser *connectedUser) {
         if xUser.user.Id == user.Id { return }
@@ -176,7 +177,7 @@ func broadcastRequested(connectionId uint32, user *database.User, msg *message) 
     return flagProceed
 }
 
-func proceedRequested(msg *message) int32 {
+func (sync *syncT) proceedRequested(msg *message) int32 {
     utils.Assert(msg != nil && msg.to != msg.from && msg.size > 0 && msg.body != nil)
 
     if toUserConnectionId, toUser := connections.getAuthorizedConnectedUser(msg.to); toUser != nil {
@@ -192,7 +193,7 @@ func proceedRequested(msg *message) int32 {
     return flagProceed
 }
 
-func parseCredentials(msg *message) (username []byte, unhashedPassword []byte) {
+func (sync *syncT) parseCredentials(msg *message) (username []byte, unhashedPassword []byte) {
     utils.Assert(msg != nil && (msg.flag == flagLogIn || msg.flag == flagRegister))
 
     username = make([]byte, usernameSize)
@@ -204,9 +205,9 @@ func parseCredentials(msg *message) (username []byte, unhashedPassword []byte) {
     return username, unhashedPassword
 }
 
-func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 { // expects the password not to be hashed in order to compare it with salted hash (which is always different)
+func (sync *syncT) loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 { // expects the password not to be hashed in order to compare it with salted hash (which is always different)
     utils.Assert(msg != nil && msg.size > 0 && msg.body != nil)
-    username, unhashedPassword := parseCredentials(msg)
+    username, unhashedPassword := sync.parseCredentials(msg)
 
     xUsernameSize := uint(len(username)); passwordSize := uint(len(unhashedPassword))
     utils.Assert(
@@ -222,8 +223,8 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
 
     if user == nil || xConnectedUser != nil {
         sync.rwMutex.Unlock()
-        Net.sendMessage(connectionId, errorMessage(flagLogIn, toAnonymous))
-        finishRequested(connectionId)
+        Net.sendMessage(connectionId, sync.errorMessage(flagLogIn, toAnonymous))
+        sync.finishRequested(connectionId)
         return flagFinishWithError
     }
 
@@ -232,18 +233,18 @@ func loggingInWithCredentialsRequested(connectionId uint32, msg *message) int32 
 
     token := crypto.MakeToken(connectionId, user.Id) // won't compile if inline the variable
     sync.rwMutex.Unlock()
-    Net.sendMessage(connectionId, serverMessage(flagLoggedIn, user.Id, token[:])) // here's how a client obtains his id
+    Net.sendMessage(connectionId, sync.serverMessage(flagLoggedIn, user.Id, token[:])) // here's how a client obtains his id
     return flagProceed
 }
 
-func registrationWithCredentialsRequested(connectionId uint32, msg *message) int32 {
+func (sync *syncT) registrationWithCredentialsRequested(connectionId uint32, msg *message) int32 {
     utils.Assert(msg != nil && msg.size > 0 && msg.body != nil)
 
     sync.rwMutex.Lock()
     if database.GetUsersCount() >= sync.maxUsersCount {
         sync.rwMutex.Unlock()
-        Net.sendMessage(connectionId, errorMessage(flagRegister, toAnonymous))
-        finishRequested(connectionId)
+        Net.sendMessage(connectionId, sync.errorMessage(flagRegister, toAnonymous))
+        sync.finishRequested(connectionId)
         return flagFinishWithError
     }
 
@@ -255,7 +256,7 @@ func registrationWithCredentialsRequested(connectionId uint32, msg *message) int
         return zeroes
     }
 
-    username, unhashedPassword := parseCredentials(msg)
+    username, unhashedPassword := sync.parseCredentials(msg)
     var user *database.User = nil
 
     usernameNonZeroes := usernameSize - countZeroes(username)
@@ -270,14 +271,14 @@ func registrationWithCredentialsRequested(connectionId uint32, msg *message) int
 
     sync.rwMutex.Unlock()
     Net.sendMessage(connectionId, func() *message { // Lack of ternary operator is awful. Presence of closures/anonymous functions is great.
-        if successful { return simpleServerMessage(flagRegistered, user.Id) } else { return errorMessage(flagRegister, toAnonymous) }
+        if successful { return sync.simpleServerMessage(flagRegistered, user.Id) } else { return sync.errorMessage(flagRegister, toAnonymous) }
     }())
 
-    finishRequested(connectionId)
+    sync.finishRequested(connectionId)
     if successful { return flagFinishToReconnect } else { return flagFinishWithError }
 }
 
-func finishRequested(connectionId uint32) int32 {
+func (sync *syncT) finishRequested(connectionId uint32) int32 {
     sync.rwMutex.Lock() // TODO: redundant locks usage here
     connections.deleteConnection(connectionId)
     sync.rwMutex.Unlock()
@@ -285,7 +286,7 @@ func finishRequested(connectionId uint32) int32 {
 }
 
 //goland:noinspection GoRedundantConversion
-func usersListRequested(connectionId uint32, userId uint32) int32 {
+func (sync *syncT) usersListRequested(connectionId uint32, userId uint32) int32 {
     sync.rwMutex.RLock()
 
     registeredUsers := database.GetAllUsers()
@@ -341,7 +342,7 @@ func usersListRequested(connectionId uint32, userId uint32) int32 {
 }
 
 //goland:noinspection GoRedundantConversion
-func messagesRequested(connectionId uint32, msg *message) int32 {
+func (sync *syncT) messagesRequested(connectionId uint32, msg *message) int32 {
     utils.Assert(msg.size > 0 && msg.body != nil)
 
     const byteSize = 1
@@ -365,7 +366,7 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
     }
 
     if !database.UserExists(fromUser) {
-        Net.sendMessage(connectionId, errorMessage(flagFetchMessages, msg.from))
+        Net.sendMessage(connectionId, sync.errorMessage(flagFetchMessages, msg.from))
         return flagError
     }
 
@@ -412,7 +413,7 @@ func messagesRequested(connectionId uint32, msg *message) int32 {
     return flagProceed
 }
 
-func routeMessage(connectionId uint32, msg *message) int32 {
+func (sync *syncT) routeMessage(connectionId uint32, msg *message) int32 {
     utils.Assert(msg != nil)
     flag := msg.flag
     xConnectionId, userIdFromToken := crypto.OpenToken(msg.token)
@@ -424,8 +425,8 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     userId := connections.getConnectedUserId(connectionId)
 
     interruptConnection := func(flag int32, to uint32) {
-        Net.sendMessage(connectionId, errorMessage(flag, to))
-        finishRequested(connectionId)
+        Net.sendMessage(connectionId, sync.errorMessage(flag, to))
+        sync.finishRequested(connectionId)
     }
 
     if flag == flagLogIn || flag == flagRegister {
@@ -468,8 +469,8 @@ func routeMessage(connectionId uint32, msg *message) int32 {
     sync.rwMutex.Unlock()
 
     if shuttingDown {
-        Net.sendMessage(connectionId, simpleServerMessage(flagError, *userId))
-        finishRequested(connectionId)
+        Net.sendMessage(connectionId, sync.simpleServerMessage(flagError, *userId))
+        sync.finishRequested(connectionId)
         return flagFinishWithError
     }
 
@@ -484,7 +485,7 @@ func routeMessage(connectionId uint32, msg *message) int32 {
 
     switch flag {
         case flagShutdown:
-            return shutdownRequested(connectionId, connections.getUser(connectionId), msg)
+            return sync.shutdownRequested(connectionId, connections.getUser(connectionId), msg)
         case flagExchangeKeys: fallthrough
         case flagExchangeKeysDone: fallthrough
         case flagExchangeHeaders: fallthrough
@@ -492,19 +493,19 @@ func routeMessage(connectionId uint32, msg *message) int32 {
         case flagFileAsk: fallthrough
         case flagFile: fallthrough
         case flagProceed:
-            return proceedRequested(msg)
+            return sync.proceedRequested(msg)
         case flagLogIn:
-            return doIfToServerOrInterrupt(func() int32 { return loggingInWithCredentialsRequested(connectionId, msg) })
+            return doIfToServerOrInterrupt(func() int32 { return sync.loggingInWithCredentialsRequested(connectionId, msg) })
         case flagRegister:
-            return doIfToServerOrInterrupt(func() int32 { return registrationWithCredentialsRequested(connectionId, msg) })
+            return doIfToServerOrInterrupt(func() int32 { return sync.registrationWithCredentialsRequested(connectionId, msg) })
         case flagFinish:
-            return doIfToServerOrInterrupt(func() int32 { return finishRequested(connectionId) })
+            return doIfToServerOrInterrupt(func() int32 { return sync.finishRequested(connectionId) })
         case flagFetchUsers:
-            return doIfToServerOrInterrupt(func() int32 { return usersListRequested(connectionId, *userIdFromToken) })
+            return doIfToServerOrInterrupt(func() int32 { return sync.usersListRequested(connectionId, *userIdFromToken) })
         case flagFetchMessages:
-            return doIfToServerOrInterrupt(func() int32 { return messagesRequested(connectionId, msg) })
+            return doIfToServerOrInterrupt(func() int32 { return sync.messagesRequested(connectionId, msg) })
         case flagBroadcast:
-            return broadcastRequested(connectionId, connections.getUser(connectionId), msg)
+            return sync.broadcastRequested(connectionId, connections.getUser(connectionId), msg)
         default:
             interruptConnection(flagError, msg.from)
             return flagFinishWithError

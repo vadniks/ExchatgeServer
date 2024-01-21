@@ -331,7 +331,7 @@ func (net *netT) processEncryptedClientMessage(connectionId uint32, messageBytes
     utils.Assert(len(decrypted) > 0 && len(decrypted) <= int(maxMessageSize))
     message := net.unpackMessage(decrypted)
 
-    return routeMessage(connectionId, message)
+    return sync.routeMessage(connectionId, message)
 }
 
 //goland:noinspection GoRedundantConversion
