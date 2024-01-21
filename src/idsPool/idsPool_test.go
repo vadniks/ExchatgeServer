@@ -18,4 +18,33 @@
 
 package idsPool
 
+import (
+    "math/rand"
+    "testing"
+)
 
+func TestBasic(t *testing.T) {
+    const size = 100
+    pool := InitIdsPool(size)
+
+    for i := uint32(0); i < size; i++ {
+        j := pool.TakeId()
+        if j == nil || i != *j { t.Error() }
+    }
+
+    var returned []uint32
+
+    for i := uint32(size / 2); i < size; i++ {
+        makeNext:
+        next := uint32(rand.Intn(size))
+
+        for _, i := range returned { if next == i { goto makeNext } } // only unique values needed
+
+        pool.ReturnId(next)
+        returned = append(returned, next)
+    }
+
+    for range returned { if pool.TakeId() == nil { t.Error() } }
+
+    if pool.TakeId() != nil { t.Error() }
+}
