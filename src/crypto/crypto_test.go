@@ -35,3 +35,24 @@ func TestKeyExchange(t *testing.T) {
 
     if !(bytes.Equal(clientKey, clientKey2) && bytes.Equal(serverKey2, serverKey2)) { t.Error() }
 }
+
+func TestCoderStreams(t *testing.T) {
+    clientKey := []byte{131, 3, 162, 82, 136, 103, 195, 49, 233, 142, 113, 208, 245, 145, 10, 229, 91, 199, 28, 252, 214, 171, 8, 249, 51, 93, 38, 178, 143, 222, 61, 17}
+    serverKey := []byte{45, 188, 222, 137, 223, 50, 85, 239, 153, 62, 106, 87, 202, 63, 149, 150, 233, 242, 46, 12, 124, 105, 252, 169, 19, 233, 209, 152, 183, 234, 91, 104}
+    if len(clientKey) != len(serverKey) || len(clientKey) != int(KeySize) { t.Error() }
+
+    header, coders1 := CreateEncoderStream(serverKey)
+    if !coders1.CreateDecoderStream(serverKey, header) { t.Error() }
+
+    text := make([]byte, 10)
+    exposedTest_randomize(text)
+    if len(text) == 0 { t.Error() }
+
+    encrypted := coders1.Encrypt(text)
+    if len(encrypted) == 0 { t.Error() }
+
+    decrypted := coders1.Decrypt(encrypted)
+    if len(decrypted) == 0 { t.Error() }
+
+    if !bytes.Equal(text, decrypted) { t.Error() }
+}

@@ -239,7 +239,7 @@ func (net *netT) processClient(connection *goNet.Conn, connectionId uint32, wait
         return
     }
 
-    serverStreamHeader, xCrypto := crypto.CreateEncoderStream(serverKey)
+    serverStreamHeader, coders := crypto.CreateEncoderStream(serverKey)
     net.send(connection, crypto.Sign(serverStreamHeader))
 
     clientStreamHeader := make([]byte, crypto.HeaderSize)
@@ -248,12 +248,12 @@ func (net *netT) processClient(connection *goNet.Conn, connectionId uint32, wait
         return
     }
 
-    if !xCrypto.CreateDecoderStream(clientKey, clientStreamHeader) {
+    if !coders.CreateDecoderStream(clientKey, clientStreamHeader) {
         closeConnection(false)
         return
     }
 
-    connections.addNewConnection(connectionId, connection, xCrypto)
+    connections.addNewConnection(connectionId, connection, coders)
     for {
         disconnected := false
 

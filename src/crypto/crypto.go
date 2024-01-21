@@ -237,6 +237,7 @@ func MakeServerToken(messageBodySize uint) [TokenSize]byte { // letting clients 
 
 ////////////////////////////////
 
+//goland:noinspection GoSnakeCaseUsage
 func exposedTest_exchangeKeysAsClient(clientPublicKey []byte, clientSecretKey []byte, serverPublicKey []byte) ([]byte, []byte) {
     utils.Assert(
         len(serverPublicKey) == int(KeySize) &&
@@ -256,3 +257,5 @@ func exposedTest_exchangeKeysAsClient(clientPublicKey []byte, clientSecretKey []
         return nil, nil
     }
 }
+
+func exposedTest_randomize(buffer []byte) { sodium.Randomize(&sodium.BoxNonce{Bytes: buffer}) }
