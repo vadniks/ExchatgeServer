@@ -24,9 +24,9 @@ import (
     "unsafe"
 )
 
-func TestPacking(t *testing.T) {
+func TestPackMessage(t *testing.T) {
     token := [64]byte{}
-    for i := range token { token[i] = 8 }
+    for i := range token { token[i] = 7 }
 
     body := []byte{8, 8}
 
@@ -51,4 +51,25 @@ func TestPacking(t *testing.T) {
     if *((*uint32) (unsafe.Pointer(&(packed[4 * 5 + 8])))) != 6 { t.Error() }
     if !bytes.Equal(token[:], packed[(4 * 6 + 8):(4 * 6 + 8 + 64)]) { t.Error() }
     if !bytes.Equal(body, packed[(4 * 6 + 8 + 64):]) { t.Error() }
+}
+
+// TODO: test if body is null
+
+func TestUnpackMessage(t *testing.T) {
+    packed := []byte{0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 6, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8}
+
+    unpacked := ((*netT) (nil)).unpackMessage(packed)
+
+    if unpacked.flag != 0 { t.Error() }
+    if unpacked.timestamp != 1 { t.Error() }
+    if unpacked.size != 2 { t.Error() }
+    if unpacked.index != 3 { t.Error() }
+    if unpacked.count != 4 { t.Error() }
+    if unpacked.from != 5 { t.Error() }
+    if unpacked.to != 6 { t.Error() }
+
+    if len(unpacked.body) != 2 { t.Error() }
+
+    for _, i := range unpacked.token { if i != 7 { t.Error() } }
+    for _, i := range unpacked.body { if i != 8 { t.Error() } }
 }
