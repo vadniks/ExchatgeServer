@@ -234,3 +234,25 @@ func MakeServerToken(messageBodySize uint) [TokenSize]byte { // letting clients 
 
     return arr
 }
+
+////////////////////////////////
+
+func exposedTest_exchangeKeysAsClient(clientPublicKey []byte, clientSecretKey []byte, serverPublicKey []byte) ([]byte, []byte) {
+    utils.Assert(
+        len(serverPublicKey) == int(KeySize) &&
+        len(clientSecretKey) == int(KeySize) &&
+        len(clientPublicKey) == int(KeySize),
+    )
+
+    keys := sodium.KXKP{
+        PublicKey: sodium.KXPublicKey{Bytes: clientPublicKey},
+        SecretKey: sodium.KXSecretKey{Bytes: clientSecretKey},
+    }
+    sessionKeys, err := keys.ClientSessionKeys(sodium.KXPublicKey{Bytes: serverPublicKey})
+
+    if err == nil {
+        return sessionKeys.Rx.Bytes, sessionKeys.Tx.Bytes
+    } else {
+        return nil, nil
+    }
+}
