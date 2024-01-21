@@ -46,11 +46,16 @@ func checkDatabaseAvailability(url string) bool {
 ////////////////////////////////////////////////////////////////////////////////
 
 func main() {
-    print("\033[1;32m" +
-    "_______ _     _ _______ _     _ _______ _______  ______ _______\n" +
-    "|______  \\___/  |       |_____| |_____|    |    |  ____ |______\n" +
-    "|______ _/   \\_ |_____  |     | |     |    |    |_____| |______\n" +
-    "                   free software (GNU GPL v3)                   \033[0m\n")
+    print(
+        "\r\033[1;32m" + // Figlet
+        "           _______ _     _ _______ _     _ _______ _______  ______ _______            \n" +
+        "           |______  \\___/  |       |_____| |_____|    |    |  ____ |______           \n" +
+        "           |______ _/   \\_ |_____  |     | |     |    |    |_____| |______           \n" +
+        "Exchatge (Server) Copyright (C) 2023-2024  Vadim Nikolaev (https://github.com/vadniks)\n" +
+        "                   This program comes with ABSOLUTELY NO WARRANTY;                    \n" +
+        "This is free software, and you are welcome to redistribute it under certain conditions\n" +
+        "\033[0m",
+    )
 
     println("Exchatge server started...")
 
