@@ -21,6 +21,7 @@ package crypto
 import (
     "bytes"
     "testing"
+    "unsafe"
 )
 
 func TestKeyExchange(t *testing.T) {
@@ -46,10 +47,10 @@ func TestCoderStreams(t *testing.T) { // fmt.Printf("%v", key)
 
     text := make([]byte, 10)
     exposedTest_randomize(text)
-    if len(text) == 0 { t.Error() }
 
     encrypted := coders1.Encrypt(text)
     if len(encrypted) == 0 { t.Error() }
+    if uint(len(encrypted)) != EncryptedSize(uint(len(text))) { t.Error() }
 
     decrypted := coders1.Decrypt(encrypted)
     if len(decrypted) == 0 { t.Error() }
@@ -60,10 +61,27 @@ func TestCoderStreams(t *testing.T) { // fmt.Printf("%v", key)
 func TestPasswordHash(t *testing.T) {
     text := make([]byte, 10)
     exposedTest_randomize(text)
-    if len(text) == 0 { t.Error() }
 
     hashed := Hash(text)
     if len(hashed) == 0 { t.Error() }
 
     if !CompareWithHash(hashed, text) { t.Error() }
+}
+
+func TestSingleCrypt(t *testing.T) {
+    const size = 10
+    buffer := make([]byte, size + KeySize)
+    exposedTest_randomize(buffer)
+
+    text := unsafe.Slice(&(buffer[0]), size)
+    key := unsafe.Slice(&(buffer[size]), KeySize)
+
+    encrypted := encryptSingle(text, key)
+    if len(encrypted) == 0 { t.Error() }
+    if uint(len(encrypted)) != encryptedSingleSize(size) { t.Error() }
+
+    decrypted := decryptSingle(encrypted, key)
+    if len(decrypted) == 0 { t.Error() }
+
+    if !bytes.Equal(text, decrypted) { t.Error() }
 }
