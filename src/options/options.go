@@ -19,6 +19,8 @@
 package options
 
 import (
+    "ExchatgeServer/crypto"
+    "encoding/hex"
     "os"
     "path/filepath"
     "strconv"
@@ -36,6 +38,7 @@ const (
     maxTimeMillisToPreserveActiveConnection = "maxTimeMillisToPreserveActiveConnection"
     maxTimeMillisIntervalBetweenMessages = "maxTimeMillisIntervalBetweenMessages"
     linesCount = 8
+    encryptionKey = "0123456789abcdef0123456789abcdef" // <------- change the key or use crypto.GenericHash(__AS_BYTE_SLICE__(utils.MachineId()), crypto.KeySize)
 )
 
 type Options struct {
@@ -138,9 +141,23 @@ func parseServerPrivateSignKey(value string, secretKeySize uint) []byte { // nil
     }
 }
 
-func parseMongodbUrl(value string) string { return value }
+func makeEncryptionKey() []byte { return crypto.GenericHash([]byte(encryptionKey), crypto.KeySize) }
+
+func parseMongodbUrl(value string) string {
+    //println(hex.EncodeToString(crypto.EncryptSingle([]byte("mongodb://root:root@mongodb:27017"), crypto.GenericHash([]byte(encryptionKey), crypto.KeySize))))
+
+    decoded, err := hex.DecodeString(value)
+    if err != nil { return "" }
+    return string(crypto.DecryptSingle(decoded, makeEncryptionKey()))
+}
 
 func parseAdminPassword(value string, maxPasswordSize uint) []byte { // nillable
+    //println(hex.EncodeToString(crypto.EncryptSingle([]byte("admin"), crypto.GenericHash([]byte(encryptionKey), crypto.KeySize))))
+
+    decoded, err := hex.DecodeString(value)
+    if err != nil { return nil }
+    value = string(crypto.DecryptSingle(decoded, makeEncryptionKey()))
+
     bytes := make([]byte, maxPasswordSize)
 
     var count uint = 0
