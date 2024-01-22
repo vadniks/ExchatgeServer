@@ -141,22 +141,20 @@ func parseServerPrivateSignKey(value string, secretKeySize uint) []byte { // nil
     }
 }
 
-func makeEncryptionKey() []byte { return crypto.GenericHash([]byte(encryptionKey), crypto.KeySize) }
+func decodeAndDecrypt(value string) string {
+    decoded, err := hex.DecodeString(value)
+    if err != nil { return "" }
+    return string(crypto.DecryptSingle(decoded, crypto.GenericHash([]byte(encryptionKey), crypto.KeySize)))
+}
 
 func parseMongodbUrl(value string) string {
     //println(hex.EncodeToString(crypto.EncryptSingle([]byte("mongodb://root:root@mongodb:27017"), crypto.GenericHash([]byte(encryptionKey), crypto.KeySize))))
-
-    decoded, err := hex.DecodeString(value)
-    if err != nil { return "" }
-    return string(crypto.DecryptSingle(decoded, makeEncryptionKey()))
+    return decodeAndDecrypt(value)
 }
 
 func parseAdminPassword(value string, maxPasswordSize uint) []byte { // nillable
     //println(hex.EncodeToString(crypto.EncryptSingle([]byte("admin"), crypto.GenericHash([]byte(encryptionKey), crypto.KeySize))))
-
-    decoded, err := hex.DecodeString(value)
-    if err != nil { return nil }
-    value = string(crypto.DecryptSingle(decoded, makeEncryptionKey()))
+    value = decodeAndDecrypt(value)
 
     bytes := make([]byte, maxPasswordSize)
 
