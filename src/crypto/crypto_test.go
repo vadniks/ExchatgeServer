@@ -59,6 +59,12 @@ func TestCoderStreams(t *testing.T) { // fmt.Printf("%v", key)
     if !bytes.Equal(text, decrypted) { t.Error() }
 }
 
+func TestGenericHash(t *testing.T) {
+    text := "0123456789abcdef"
+    hash := GenericHash([]byte(text), KeySize)
+    if len(hash) != int(KeySize) { t.Error() }
+}
+
 func TestPasswordHash(t *testing.T) {
     text := make([]byte, 10)
     exposedTest_randomize(text)
