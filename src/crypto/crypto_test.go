@@ -77,11 +77,11 @@ func TestSingleCrypt(t *testing.T) {
     text := unsafe.Slice(&(buffer[0]), size)
     key := unsafe.Slice(&(buffer[size]), KeySize)
 
-    encrypted := encryptSingle(text, key)
+    encrypted := EncryptSingle(text, key)
     if len(encrypted) == 0 { t.Error() }
     if uint(len(encrypted)) != encryptedSingleSize(size) { t.Error() }
 
-    decrypted := decryptSingle(encrypted, key)
+    decrypted := DecryptSingle(encrypted, key)
     if len(decrypted) == 0 { t.Error() }
 
     if !bytes.Equal(text, decrypted) { t.Error() }

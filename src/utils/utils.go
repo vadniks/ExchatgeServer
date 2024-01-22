@@ -18,8 +18,20 @@
 
 package utils
 
-import "time"
+import (
+    "os"
+    "time"
+)
 
 func JustThrow() { panic(any("")) }
 func Assert(condition bool) { if !condition { JustThrow() } }
 func CurrentTimeMillis() uint64 { return uint64(time.Now().UnixMilli()) }
+
+func MachineId() int64 {
+    bytes, err := os.ReadFile("/etc/machine-id")
+    if err != nil { return int64(-1) }
+
+    var id int64 = 0
+    for _, i := range bytes { id ^= int64(i) }
+    return id
+}

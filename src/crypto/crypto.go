@@ -139,6 +139,18 @@ func (coders *Coders) Decrypt(bytes []byte) []byte {
     return decrypted
 }
 
+func GenericHash(bytes []byte, size uint) []byte {
+    utils.Assert(len(bytes) > 0 && size >= 16 && size <= 64)
+    hash := sodium.NewGenericHash(int(size))
+
+    written, err := hash.Write(bytes)
+    utils.Assert(written == len(bytes) && err == nil)
+
+    result := hash.Sum(nil)
+    utils.Assert(len(result) == int(size))
+    return result
+}
+
 func Hash(bytes []byte) []byte {
     utils.Assert(len(bytes) > 0)
     return sodium.PWHashStore(string(bytes)).Value()
@@ -159,7 +171,7 @@ func Sign(bytes []byte) []byte {
     return result
 }
 
-func encryptSingle(bytes []byte, key []byte) []byte { // encrypts only one message, compared with Encrypt, which encrypts a set of related messages
+func EncryptSingle(bytes []byte, key []byte) []byte { // encrypts only one message, compared with Encrypt, which encrypts a set of related messages
     bytesSize := uint(len(bytes))
     utils.Assert(bytesSize > 0 && uint(len(key)) == KeySize)
 
@@ -175,7 +187,7 @@ func encryptSingle(bytes []byte, key []byte) []byte { // encrypts only one messa
     return encrypted
 }
 
-func decryptSingle(bytes []byte, key []byte) []byte { // same as encryptSingle
+func DecryptSingle(bytes []byte, key []byte) []byte { // same as EncryptSingle
     bytesSize := uint(len(bytes))
     utils.Assert(bytesSize > 0 && len(key) == int(KeySize))
 
@@ -195,7 +207,7 @@ func MakeToken(connectionId uint32, userId uint32) [TokenSize]byte {
     copy(bytes, unsafe.Slice((*byte) (unsafe.Pointer(&connectionId)), intSize))
     copy(unsafe.Slice(&(bytes[intSize]), intSize), unsafe.Slice((*byte) (unsafe.Pointer(&userId)), intSize))
 
-    encrypted := encryptSingle(bytes, tokenEncryptionKey)
+    encrypted := EncryptSingle(bytes, tokenEncryptionKey)
     utils.Assert(len(encrypted) == int(TokenSize - tokenTrailingSize))
 
     withTrailing := [TokenSize]byte{}
@@ -209,7 +221,7 @@ func OpenToken(withTrailing [TokenSize]byte) (*uint32, *uint32) { // nillable re
     token := withTrailing[:TokenSize - tokenTrailingSize]
     utils.Assert(len(token) == int(encryptedSingleSize(tokenUnencryptedValueSize)))
 
-    decrypted := decryptSingle(token, tokenEncryptionKey)
+    decrypted := DecryptSingle(token, tokenEncryptionKey)
     if decrypted == nil || len(decrypted) != tokenUnencryptedValueSize { return nil, nil }
 
     connectionId := new(uint32); userId := new(uint32)
