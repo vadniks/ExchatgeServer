@@ -42,6 +42,7 @@ the actual build can be performed:
 ```shell
 # should be executed from the repository's root directory
 (cd src; go get)
+(cd src/crypto; go test) # run crypto tests
 go build -C src -o "$(pwd)/build/ExchatgeServer" ExchatgeServer
 ```
 
