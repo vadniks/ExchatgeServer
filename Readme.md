@@ -29,7 +29,8 @@ The following libraries are used:
 
 ## The project is currently in development stage
 
-[The client](https://github.com/vadniks/ExchatgeDesktopClient)
+[Desktop Linux client](https://github.com/vadniks/ExchatgeDesktopClient) \
+[Android client](https://github.com/vadniks/ExchatgeAndroidClient)
 
 ## Build
 
