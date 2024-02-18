@@ -208,6 +208,7 @@ func (_ *netT) updateConnectionIdleTimeout(connection *goNet.Conn) {
 
 func (net *netT) processClient(connection *goNet.Conn, connectionId uint32, waitGroup *goSync.WaitGroup, onShutDownRequested *func()) {
     utils.Assert(waitGroup != nil && onShutDownRequested != nil)
+    println("connection ", connectionId, " connected")
 
     net.updateConnectionIdleTimeout(connection)
 
@@ -223,6 +224,7 @@ func (net *netT) processClient(connection *goNet.Conn, connectionId uint32, wait
         waitGroup.Done()
 
         utils.Assert((*connection).Close() == nil)
+        println("connection ", connectionId, " disconnected")
     }
 
     net.send(connection, crypto.Sign(net.serverPublicKey))
@@ -328,7 +330,7 @@ func (net *netT) processEncryptedClientMessage(connectionId uint32, messageBytes
     utils.Assert(coders != nil && len(messageBytes) > 0 && uint(len(messageBytes)) <= crypto.EncryptedSize(maxMessageSize))
 
     decrypted := coders.Decrypt(messageBytes)
-    utils.Assert(len(decrypted) > 0 && len(decrypted) <= int(maxMessageSize))
+    utils.Assert(len(decrypted) > 0 && len(decrypted) <= int(maxMessageSize)) // TODO: return flag_finish_with_error
     message := net.unpackMessage(decrypted)
 
     return sync.routeMessage(connectionId, message)
