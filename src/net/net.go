@@ -242,10 +242,18 @@ func (net *netT) processClient(connection *goNet.Conn, connectionId uint32, wait
     }
 
     serverStreamHeader, coders := crypto.CreateEncoderStream(serverKey)
-    net.send(connection, crypto.Sign(serverStreamHeader))
+    encryptedServerStreamHeader := crypto.EncryptSingle(serverStreamHeader, serverKey)
+    utils.Assert(encryptedServerStreamHeader != nil)
+    net.send(connection, encryptedServerStreamHeader)
 
-    clientStreamHeader := make([]byte, crypto.HeaderSize)
-    if !net.receive(connection, clientStreamHeader, nil) {
+    encryptedClientStreamHeader := make([]byte, crypto.EncryptedSingleSize(crypto.HeaderSize))
+    if !net.receive(connection, encryptedClientStreamHeader, nil) {
+        closeConnection(false)
+        return
+    }
+
+    clientStreamHeader := crypto.DecryptSingle(encryptedClientStreamHeader, clientKey)
+    if clientKey == nil {
         closeConnection(false)
         return
     }

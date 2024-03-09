@@ -62,7 +62,7 @@ func GenerateServerKeys() ([]byte, []byte) {
 }
 
 func EncryptedSize(unencryptedSize uint) uint { return unencryptedSize + encryptedAdditionalBytesSize }
-func encryptedSingleSize(unencryptedSize uint) uint { return macSize + unencryptedSize + nonceSize }
+func EncryptedSingleSize(unencryptedSize uint) uint { return macSize + unencryptedSize + nonceSize }
 
 func ExchangeKeys(serverPublicKey []byte, serverSecretKey []byte, clientPublicKey []byte) ([]byte, []byte) { // returns nillable serverKey & clientKey
     utils.Assert(
@@ -179,7 +179,7 @@ func EncryptSingle(bytes []byte, key []byte) []byte { // encrypts only one messa
     sodium.Randomize(&nonce)
 
     ciphered := sodium.Bytes(bytes).SecretBox(nonce, sodium.SecretBoxKey{Bytes: key})
-    encrypted := make([]byte, encryptedSingleSize(bytesSize))
+    encrypted := make([]byte, EncryptedSingleSize(bytesSize))
 
     copy(encrypted, ciphered)
     copy(unsafe.Slice(&(encrypted[bytesSize + macSize]), nonceSize), nonce.Bytes)
@@ -219,7 +219,7 @@ func MakeToken(connectionId uint32, userId uint32) [TokenSize]byte {
 //goland:noinspection GoRedundantConversion for (*byte) as without this it won't compile
 func OpenToken(withTrailing [TokenSize]byte) (*uint32, *uint32) { // nillable results
     token := withTrailing[:TokenSize - tokenTrailingSize]
-    utils.Assert(len(token) == int(encryptedSingleSize(tokenUnencryptedValueSize)))
+    utils.Assert(len(token) == int(EncryptedSingleSize(tokenUnencryptedValueSize)))
 
     decrypted := DecryptSingle(token, tokenEncryptionKey)
     if decrypted == nil || len(decrypted) != tokenUnencryptedValueSize { return nil, nil }

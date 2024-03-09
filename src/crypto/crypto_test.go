@@ -85,7 +85,7 @@ func TestSingleCrypt(t *testing.T) {
 
     encrypted := EncryptSingle(text, key)
     if len(encrypted) == 0 { t.Error() }
-    if uint(len(encrypted)) != encryptedSingleSize(size) { t.Error() }
+    if uint(len(encrypted)) != EncryptedSingleSize(size) { t.Error() }
 
     decrypted := DecryptSingle(encrypted, key)
     if len(decrypted) == 0 { t.Error() }
